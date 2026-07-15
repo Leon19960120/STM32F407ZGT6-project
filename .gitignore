@@ -1,0 +1,38 @@
+# Clangd / VSCode 索引缓存
+.cache/
+.vscode/
+.idea/
+
+# 编译输出目录
+build/
+Objects/
+Listings/
+Debug/
+Release/
+output/
+tmp/
+
+# Keil MDK 工程临时文件
+*.uvoptx
+*.uvguix
+*.uvguix.*
+*.bak
+*.tmp
+
+# 编译产物
+*.o
+*.d
+*.elf
+*.axf
+*.hex
+*.bin
+*.map
+*.lst
+*.crf
+*.htm
+*.i
+
+# 日志与系统文件
+*.log
+.DS_Store
+Thumbs.db
