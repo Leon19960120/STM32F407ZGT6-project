@@ -1,114 +1,222 @@
-# SHT35 环境数据采集与网络传输系统
+# SHT35 环境数据采集与 OneNET 云平台传输系统
 
-基于 **STM32F407** 的多传感器数据采集与以太网传输系统，集成温湿度（SHT3x）、光照（SY30）传感器，通过 **W5500** 以太网模块上传数据，同时在 **TFT LCD** 上本地显示。
+基于 **STM32F407** 的多传感器数据采集、本地显示与以太网上传系统。通过 **W5500** 以太网模块使用 **MQTT 协议**将温湿度、光照数据上报至 **OneNET 云平台**，同时在 **TFT LCD** 上本地实时显示。
+
+> **项目状态**：已完成从 STM32F103 StdPeriph + Keil MDK 到 STM32F407 HAL + Makefile 的迁移。
 
 ## 硬件平台
 
 | 组件 | 型号/协议 | 说明 |
 |------|----------|------|
-| MCU | STM32F407xx（Cortex-M4，168MHz） | STMicroelectronics |
-| 温湿度传感器 | SHT3x（I2C） | 高精度数字温湿度 |
-| 光照传感器 | SY30（I2C） | 光照强度检测 |
-| 以太网 | W5500（SPI） | 内置 TCP/IP 协议栈 |
+| MCU | STM32F407ZGT6（Cortex-M4F，168MHz） | 1MB Flash / 192KB RAM |
+| 温湿度传感器 | SHT3x（I2C1） | 高精度数字温湿度 |
+| 光照传感器 | SY30/BH1750（I2C2） | 光照强度检测 |
+| 以太网 | W5500（SPI1） | 内置 TCP/IP 协议栈 |
 | LCD | TFT LCD（FSMC + SPI） | 彩色显示屏 |
 | 实时时钟 | RTC（I2C） | 时间记录 |
+| 调试串口 | USART1（PA9/PA10） | 115200 baud，printf 重定向 |
 
 ## 功能特性
 
-- **温湿度采集**：通过 I2C 读取 SHT3x 传感器数据
-- **光照强度检测**：SY30 光照传感器数据采集
+- **多传感器采集**：SHT3x 温湿度 + SY30 光照强度 + RTC 时间戳
 - **以太网通信**：W5500 实现 TCP/UDP 网络传输
-- **本地显示**：TFT LCD 实时显示传感器数据
-- **RTC 时间戳**：通过 RTC 提供精确的时间信息
-- **串口调试**：USART 用于调试信息和日志输出
+- **MQTT 云平台**：通过 MQTT 协议连接 OneNET 云平台（mqtts.heclouds.com）
+- **JSON 数据上报**：cJSON 序列化传感器数据为 JSON 格式
+- **云端指令响应**：订阅云端 Topic，解析 JSON 控制指令（如 LED 开关）
+- **本地显示**：TFT LCD 实时显示温湿度、光照数据和日期时间
+- **DHCP/DNS**：支持自动获取 IP 和域名解析
+- **串口调试**：USART1 输出调试信息和日志
 
 ## 工程目录结构
 
 ```
 sht35/
-├── Core/                         # 核心代码（CubeMX 生成）
-│   ├── Inc/                      # 头文件
-│   │   ├── main.h
-│   │   ├── gpio.h
-│   │   ├── i2c.h
-│   │   ├── spi.h
-│   │   ├── usart.h
-│   │   ├── rtc.h
-│   │   └── fsmc.h
-│   └── Src/                      # 源文件
-│       ├── main.c                # 主函数入口
-│       ├── gpio.c
-│       ├── i2c.c
-│       ├── spi.c
-│       ├── usart.c
-│       ├── rtc.c
-│       ├── fsmc.c
-│       └── stm32f4xx_it.c
-├── Hardware/                     # 用户硬件驱动
+├── Core/                         # CubeMX 生成的核心代码
+│   ├── Inc/                      # 头文件（main.h, gpio.h, i2c.h, spi.h, usart.h, rtc.h, fsmc.h, tim.h）
+│   └── Src/                      # 源文件（main.c, stm32f4xx_it.c, stm32f4xx_hal_msp.c, system_stm32f4xx.c, syscalls.c）
+├── Hardware/                     # 用户硬件驱动层
 │   ├── Inc/
-│   │   ├── SHT3x.h               # 温湿度传感器驱动
-│   │   ├── SY30.h                # 光照传感器驱动
-│   │   ├── W5500.h               # W5500 以太网驱动
-│   │   ├── W5500_USER.h          # W5500 应用层封装
-│   │   └── lcd.h                 # TFT LCD 驱动
+│   │   ├── SHT3x.h               # 温湿度传感器（I2C1）
+│   │   ├── SY30.h                # 光照传感器（I2C2）
+│   │   ├── W5500.h               # W5500 寄存器定义
+│   │   ├── W5500_USER.h          # W5500 应用封装
+│   │   ├── lcd.h                 # TFT LCD 驱动（FSMC）
+│   │   └── font.H                # 字库
 │   └── Src/
-│       ├── SHT3x.c
-│       ├── SY30.c
-│       ├── W5500.c
-│       ├── W5500_USER.c
-│       └── lcd.c
-├── Drivers/                      # STM32 HAL 库 & CMSIS
-├── build/                        # 编译输出（.hex、.bin、.elf）
-├── Makefile                      # 构建脚本
-├── compile_commands.json         # Clangd 索引
-├── sht35.ioc                     # STM32CubeMX 工程文件
-├── STM32F407XX_FLASH.ld          # 链接脚本
-└── startup_stm32f407xx.s         # 启动文件
+│       ├── SHT3x.c               # SHT3x I2C 读写 + CRC 校验
+│       ├── SY30.c                # SY30/BH1750 光照采集
+│       ├── W5500.c               # W5500 SPI 底层驱动（HAL 批量收发优化）
+│       ├── W5500_USER.c          # W5500 Socket/中断/网络参数管理
+│       └── lcd.c                 # FSMC 驱动 TFT LCD
+├── User/                         # 业务逻辑层
+│   ├── wiz_platform/             # 硬件平台抽象层（SPI/UART/TIM/Delay 适配 ioLibrary）
+│   │   ├── wiz_platform.c        # printf 重定向、SysTick延时、TIM2 1ms中断、SPI/W5500 GPIO
+│   │   └── wiz_platform.h
+│   ├── wiz_interface/            # W5500 网络接口封装（DHCP、网络配置）
+│   │   ├── wiz_interface.c
+│   │   └── wiz_interface.h
+│   ├── MQTT/                     # MQTT 客户端业务逻辑
+│   │   ├── do_mqtt.c             # MQTT 状态机（CONN→SUB→PUB→KEEPALIVE→RECV）
+│   │   └── do_mqtt.h
+│   ├── DNS/                      # DNS 域名解析
+│   │   ├── do_dns.c
+│   │   └── do_dns.h
+│   └── CJSON/                    # cJSON JSON 解析/序列化库
+│       ├── cJSON.c
+│       └── cJSON.h
+├── NET/                          # 备用网络方案（ESP8266 HTTP / 旧版 OneNET 接入）
+│   ├── device/src/esp8266.c      # ESP8266 WiFi 驱动
+│   ├── onenet/                   # OneNET HTTP 协议接入（base64/hmac_sha1）
+│   └── MQTT/MqttKit.c            # 另一套 MQTT 封装（未启用）
+├── ioLibrary_Driver/             # WIZnet ioLibrary（TCP/IP 协议栈）
+│   ├── Ethernet/                 # socket API, wizchip_conf, W5500 底层驱动
+│   └── Internet/                 # DHCP, DNS, MQTT Client, MQTTPacket
+├── Drivers/                      # STM32 HAL Driver + CMSIS
+│   ├── STM32F4xx_HAL_Driver/     # ST 官方 HAL 库
+│   └── CMSIS/                    # ARM CMSIS-Core M4 + Device F407
+├── build/                        # 编译输出（.hex, .bin, .elf, .map）
+├── Makefile                      # GCC Makefile 构建脚本
+├── STM32F407XX_FLASH.ld          # 链接脚本（Flash 0x08000000/1MB, RAM 0x20000000/192KB）
+├── startup_stm32f407xx.s         # Cortex-M4 启动文件
+├── sht35.ioc                     # STM32CubeMX 工程配置
+└── Note.md                       # 开发笔记
+```
+
+## 软件架构分层
+
+```
+┌─────────────────────────────────────────────┐
+│           User Layer（业务逻辑）              │
+│  do_mqtt.c (MQTT状态机)  do_dns.c  cJSON    │
+├─────────────────────────────────────────────┤
+│       Hardware Abstraction（平台适配层）       │
+│  wiz_platform.c (SPI/UART/TIM/Delay)         │
+│  wiz_interface.c (DHCP/网络配置)              │
+├─────────────────────────────────────────────┤
+│       ioLibrary_Driver（WIZnet 协议栈）       │
+│  socket.c  wizchip_conf.c  w5500.c          │
+│  dhcp.c  dns.c  MQTTClient.c  MQTTPacket    │
+├─────────────────────────────────────────────┤
+│       Hardware Driver（硬件驱动层）            │
+│  W5500.c (SPI)  SHT3x.c (I2C)  SY30.c      │
+│  lcd.c (FSMC)  gpio.c  spi.c  i2c.c        │
+├─────────────────────────────────────────────┤
+│       HAL Library + CMSIS（ST 官方库）        │
+│  stm32f4xx_hal_*.c  core_cm4.h  stm32f407xx.h│
+└─────────────────────────────────────────────┘
+```
+
+## 程序运行流程
+
+```
+main()
+  ├── HAL_Init()                          # HAL 库初始化
+  ├── SystemClock_Config()                # HSI → 48MHz
+  ├── MX_GPIO_Init()                      # LED, W5500_CS/RST/INT
+  ├── MX_I2C1_Init()                      # SHT3x (I2C1)
+  ├── MX_I2C2_Init()                      # SY30 (I2C2)
+  ├── MX_SPI1_Init()                      # W5500 (SPI1)
+  ├── MX_USART1_UART_Init()               # 调试串口 (115200)
+  ├── MX_RTC_Init()                       # 实时时钟
+  ├── LCD_Init()                          # TFT LCD 初始化
+  ├── ReadSHT3x(&hum, &temp)              # 读取温湿度
+  ├── GY30_GetData()                      # 读取光照
+  ├── Wizchip_Init()                      # W5500 初始化
+  ├── network_init()                      # DHCP 获取 IP
+  ├── mqtt_init()                         # DNS解析 + TCP连接 + MQTT初始化
+  └── while(1)
+      └── do_mqtt()                       # MQTT 状态机循环
 ```
 
 ## 快速开始
 
-### 使用 Makefile 编译
+### 编译
 
 ```bash
+# 确保已安装 arm-none-eabi-gcc 工具链
 make
+
+# 清理编译产物
+make clean
+
+# 烧录（需要 OpenOCD + ST-Link）
+make flash
 ```
 
-编译产物在 `build/` 目录下，包含 `.hex`、`.bin`、`.elf` 等格式。
+### 编译产物
 
-### 使用 STM32CubeIDE / Keil
-
-1. 用 **STM32CubeMX** 打开 `sht35.ioc` 工程文件
-2. 重新生成代码
-3. 使用 STM32CubeIDE 或 Keil MDK 打开工程并编译
+| 文件 | 说明 |
+|------|------|
+| `build/sht35.bin` | 二进制固件（可直接烧录） |
+| `build/sht35.hex` | Intel HEX 格式 |
+| `build/sht35.elf` | ELF 可执行文件（调试用） |
+| `build/sht35.map` | 内存映射文件 |
 
 ### 烧录
 
-使用 ST-Link 或 J-Link 将生成的固件烧录到 STM32F407 开发板：
-
 ```bash
-# 使用 openocd 烧录
-openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program build/sht35.elf verify reset exit"
+# 使用 OpenOCD + ST-Link
+openocd -f interface/stlink.cfg -f target/stm32f4x.cfg \
+  -c "program build/sht35.elf verify reset exit"
+
+# 或使用 STM32CubeProgrammer
+STM32_Programmer_CLI -c port=swd -w build/sht35.bin 0x08000000 -v -rst
 ```
+
+## 网络配置
+
+### OneNET 云平台
+
+- **MQTT Broker**: `mqtts.heclouds.com:1883`
+- **协议**: MQTT 3.1.1
+- **发布 Topic**: `$sys/{product_id}/{device_name}/thing/property/post`
+- **订阅 Topic**: `$sys/{product_id}/{device_name}/thing/property/set`
+- **认证方式**: 设备签名认证（SHA1）
+
+> 注意：MQTT 连接参数（clientid、username、passwd）在 `User/MQTT/do_mqtt.c` 中配置。
+
+### 网络参数
+
+在 `Hardware/Src/W5500_USER.c` 中配置：
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| Gateway_IP | 手动配置 | 网关地址 |
+| Sub_Mask | 手动配置 | 子网掩码 |
+| Phy_Addr | 手动配置 | MAC 地址 |
+| IP_Addr | 手动配置 | 本机 IP |
 
 ## 编译环境
 
-- **IDE**: STM32CubeIDE / Keil MDK-ARM / VSCode
-- **编译器**: GCC ARM / ARM Compiler
-- **标准库**: STM32 HAL Library (STM32F4xx)
-- **构建工具**: Make
-- **CMSIS**: ARM Cortex-M4 Device CMSIS
+- **MCU**: STM32F407ZGT6（Cortex-M4F，带 FPU）
+- **编译器**: GCC ARM Embedded（arm-none-eabi-gcc）
+- **标准库**: STM32 HAL Library v1.6+
+- **构建工具**: GNU Make
+- **IDE**: VSCode + CMake/Makefile 插件（可选）
+- **调试器**: ST-Link / J-Link + OpenOCD
 
-## 注意事项
+### 编译器选项
 
-- 确保 SHT3x 的 I2C 总线连接正确（注意上拉电阻）
-- W5500 的 SPI 引脚需正确配置
-- FSMC 用于 LCD 驱动，需确认 FSMC 初始化正常
-- 网络参数（IP、端口等）需在 W5500_USER 中配置
+```
+-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
+-Og -Wall -fdata-sections -ffunction-sections
+-DUSE_HAL_DRIVER -DSTM32F407xx
+-specs=nano.specs
+```
+
+## 已知问题与待办
+
+- [ ] `wiz_platform.c` 仍使用 F103 StdPeriph 代码，需重写为 HAL 风格
+- [ ] `stm32f4xx_it.c` 中缺少 TIM2_IRQHandler（DHCP/DNS 计时器依赖）
+- [ ] `SystemClock_Config()` 使用 HSI 无 PLL（48MHz），建议改为 HSE + PLL 168MHz
+- [ ] 存在重复的 cJSON 源文件（`NET/CJSON/` 和 `User/CJSON/`）
+- [ ] `NET/onenet/` 目录为旧版 HTTP 协议接入方案，与当前 MQTT 方案不兼容
+- [ ] MQTT 客户端尚未与 `main.c` 中的传感器数据集成（当前只发送固定温度值 26.6）
 
 ## 参考资源
 
 - [Sensirion SHT3x 数据手册](https://www.sensirion.com/products/catalog/SHT3x/)
 - [WizNet W5500 数据手册](https://www.wiznet.io/product-item/w5500/)
-- STM32F407 Reference Manual
-- ST7735 / TFT LCD 驱动数据手册
+- [OneNET MQTT 接入文档](https://open.iot.10086.cn/doc/mqtt/book/connect.html)
+- [Paho MQTT C 客户端](https://github.com/eclipse/paho.mqtt.embedded-c)
+- [STM32F407 Reference Manual](https://www.st.com/resource/en/reference_manual/rm0090-stm32f405-415-stm32f407-417-stm32f415-417-arm-based-32-bit-mcus-stmicroelectronics.pdf)
