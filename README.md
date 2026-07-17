@@ -8,7 +8,7 @@
 |------|----------|------|
 | MCU | STM32F407xx（Cortex-M4，168MHz） | STMicroelectronics |
 | 温湿度传感器 | SHT3x（I2C） | 高精度数字温湿度 |
-| 光照传感器 | SY30 | 光照强度检测 |
+| 光照传感器 | SY30（I2C） | 光照强度检测 |
 | 以太网 | W5500（SPI） | 内置 TCP/IP 协议栈 |
 | LCD | TFT LCD（FSMC + SPI） | 彩色显示屏 |
 | 实时时钟 | RTC（I2C） | 时间记录 |
