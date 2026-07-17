@@ -67,7 +67,7 @@ HAL_StatusTypeDef SHT3x_WriteCommand(uint16_t cmd)
     buf[1] = cmd & 0xFF;        // 低8位 LSB
 
     // 正确的调用方式：它作为一条“语句”留在自建函数的肚子里面
-    return HAL_I2C_Master_Transmit(&hi2c1, SHT3x_ADDRESS, buf, 2, 100);
+    return HAL_I2C_Master_Transmit(&SHT3x_I2C_HANDLE, SHT3x_ADDRESS, buf, 2, 100);
 }
 
 /**
@@ -87,7 +87,7 @@ HAL_StatusTypeDef SHT3x_WriteCommand(uint16_t cmd)
     HAL_Delay(15);
 	//读取回来数据
 	// 【第二步】命令发完后，立刻把传感器测好的6个字节读回来
-    if (HAL_I2C_Master_Receive(&hi2c1, SHT3x_ADDRESS , recv_buf, 6, 100) != HAL_OK)
+    if (HAL_I2C_Master_Receive(&SHT3x_I2C_HANDLE, SHT3x_ADDRESS , recv_buf, 6, 100) != HAL_OK)
     {
         return 0; // 接收失败直接退出
     }

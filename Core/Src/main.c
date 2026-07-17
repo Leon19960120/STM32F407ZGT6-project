@@ -20,6 +20,8 @@
 #include "main.h"
 #include "i2c.h"
 #include "rtc.h"
+#include "spi.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 #include "fsmc.h"
@@ -28,8 +30,15 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include "SHT3x.h"  //引入温湿度传感器
-#include "SY30.h"
-#include "lcd.h"
+#include "SY30.h"   //光照传感器
+#include "lcd.h"    //TFT LCD屏幕
+#include "W5500.h"  //w5500
+#include "W5500_USER.h" //
+#include "wiz_platform.h"
+#include "wizchip_conf.h"
+#include "wiz_interface.h"
+#include "do_mqtt.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -72,7 +81,6 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-    u8 x = 0;
     u8 lcd_id[12]; // 存放LCD ID字符串
     float hum = 0.0f;       // 用于存储湿度值
     float temp = 0.0f;      // 用于存储温度值
@@ -106,7 +114,11 @@ int main(void)
   MX_I2C2_Init();
   MX_USART1_UART_Init();
   MX_RTC_Init();
+  MX_SPI1_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
+  HAL_TIM_Base_Start_IT(&htim2);
+  
   // 1. 初始化 LCD
   LCD_Init();           
     
@@ -129,7 +141,7 @@ int main(void)
 
   // 显示字符串
   POINT_COLOR = BLUE;      
-  LCD_ShowString(30, 20, 210, 24, 24, (u8*)"STM32F4 HAL");    
+  LCD_ShowString(30, 20, 210, 24, 24, (u8*)"STM32F407 HAL");    
   LCD_ShowString(30, 50, 200, 16, 16, (u8*)"TFTLCD TEST");
   LCD_ShowString(30, 70, 200, 16, 16, (u8*)"Makefile + VSCode");
   LCD_ShowString(30, 90, 200, 16, 16, lcd_id);       // 显示 LCD ID                           
@@ -138,14 +150,14 @@ int main(void)
   LCD_ShowString(30, 130, 200, 16, 16, (u8*)time_str); // 固定显示开机时间
   // 显示固定的标题（只画一次，避免闪烁）
   POINT_COLOR = BLUE;
-  LCD_ShowString(30, 150, 200, 24, 24, "SHT3x Monitor");
+  LCD_ShowString(30, 150, 200, 24, 24, (u8*)"SHT3x Monitor");
 
   POINT_COLOR = RED;
-  LCD_ShowString(30, 180, 100, 16, 16, "Temp:       C");
-  LCD_ShowString(30, 200, 100, 16, 16, "Hum :       %RH");
+  LCD_ShowString(30, 180, 100, 16, 16, (u8*)"Temp:       C");
+  LCD_ShowString(30, 200, 100, 16, 16, (u8*)"Hum :       %RH");
   // 显示光照强度
   
-  LCD_ShowString(30, 220, 100, 16, 16, "Light     Lux");       
+  LCD_ShowString(30, 220, 100, 16, 16, (u8*)"Light:     Lux");       
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -183,16 +195,16 @@ int main(void)
         BACK_COLOR = WHITE;   // 背景颜色
         
         // 显示温度 (x=60, y=60, 宽度60, 高度16, 字体16)
-        LCD_ShowString(80, 180, 70, 16, 16, str_temp); 
+        LCD_ShowString(80, 180, 70, 16, 16, (u8*)str_temp); 
         // 显示湿度 (x=60, y=90, 宽度60, 高度16, 字体16)
-        LCD_ShowString(80, 200, 70, 16, 16, str_hum);  
+        LCD_ShowString(80, 200, 70, 16, 16, (u8*)str_hum);  
     } 
     else 
     {
         // 如果读取失败，显示错误提示
         POINT_COLOR = RED;
-        LCD_ShowString(60, 180, 70, 16, 16, "Error");
-        LCD_ShowString(60, 200, 70, 16, 16, "Error");
+        LCD_ShowString(60, 180, 70, 16, 16, (u8*)"Error");
+        LCD_ShowString(60, 200, 70, 16, 16, (u8*)"Error");
     }
     
   // ================== 2. 读取并显示光照度 (SY30/BH1750) ==================
@@ -203,7 +215,7 @@ int main(void)
     POINT_COLOR = RED;
     BACK_COLOR = WHITE;
     // 在 x=80, y=220 处显示光照数值
-    LCD_ShowString(80, 220, 70, 16, 16, str_light);
+    LCD_ShowString(50, 220, 70, 16, 16, (u8*)str_light);
     // 翻转 LED 表示程序在运行
     HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_9); // 请根据你的实际 LED 引脚修改！
     // 延时 1 秒 (SHT3x 单次测量不需要太频繁)
@@ -233,11 +245,15 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.LSEState = RCC_LSE_ON;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLM = 25;
+  RCC_OscInitStruct.PLL.PLLN = 336;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -247,12 +263,12 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
   {
     Error_Handler();
   }
