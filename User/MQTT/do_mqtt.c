@@ -7,6 +7,8 @@
 #include "wiz_interface.h"
 #include "wiz_platform.h"
 
+#include "delay.h"
+
 #define MQTT_ETHERNET_MAX_SIZE (1024 * 2)
 
 MQTTClient c = {0};
@@ -17,11 +19,11 @@ mqttconn mqtt_params = {
     .mqttHostUrl = "mqtts.heclouds.com",
     .server_ip = {
         0,
-    },                                                                                                                                                     /*Define the Connection Server IP*/
+    },                                                                                                                                                  /*Define the Connection Server IP*/
     .port = 1883,                                                                                                                                          /*Define the connection service port number*/
     .clientid = "Test",                                                                                                                            /*Define the client ID*/
     .username = "Q0l3rvndi9",                                                                                                                              /*Define the user name*/
-    .passwd = "version=2018-10-31&res=products%2F70TwP2gxl5%2Fdevices%2FW5100S_W5500&et=1791400694&method=sha1&sign=0SchVg6Y2MRYn%2B9zItNZwt%2F%2FN4Y%3D", /*Define user passwords*/
+    .passwd = "version=2018-10-31&res=products%2FQ0l3rvndi9%2Fdevices%2FTest&et=2079998482&method=md5&sign=IpF4ydrbrzw3N755Q%2FS%2BZg%3D%3D", /*Define user passwords*/
     .pubtopic = "$sys/Q0l3rvndi9/Test/thing/property/post",                                                                                        /*Define the publication message*/
     .pubtopic_reply = "$sys/Q0l3rvndi9/Test/thing/property/post/reply",
     .subtopic = "$sys/Q0l3rvndi9/Test/thing/property/set", /*Define subscription messages*/
@@ -74,8 +76,16 @@ void mqtt_init(uint8_t sn, uint8_t *send_buf, uint8_t *recv_buf)
         }
     }
     NewNetwork(&n, sn);                                          /*Obtain network configuration information*/
-    ConnectNetwork(&n, mqtt_params.server_ip, mqtt_params.port); /*Connect to the MQTT server*/
+    printf("!!!!!!!!!!!!!!!!\r\n");
+    ConnectNetwork(&n, mqtt_params.server_ip, mqtt_params.port); /*Connect to the MQTT server*/   
+     // ⚠️ 替换为可靠的连接函数
+    // if (Reliable_ConnectNetwork(&n, mqtt_params.server_ip, mqtt_params.port) != 0)
+    // {
+    //     printf("[MQTT] TCP connection failed. System halted.\r\n");
+    //     while(1); // 调试阶段先卡在这里，确保你看到了报错
+    // } 
     MQTTClientInit(&c, &n, 1000, send_buf, MQTT_ETHERNET_MAX_SIZE, recv_buf, MQTT_ETHERNET_MAX_SIZE);
+    printf("1111111111111111111111\r\n");
     data.willFlag = 0;                                                            /* will flag: If the will annotation bit is 0, the following will-related settings are invalid*/
     willdata.qos = mqtt_params.willQoS;                                           /* will QoS */
     willdata.topicName.lenstring.data = mqtt_params.willtopic;                    /* will topic */
@@ -218,7 +228,7 @@ void do_mqtt(void)
     case PUB_MESSAGE:
     {
         pubmessage.qos = QOS0;
-        pubmessage.payload = "{\"id\":\"123\",\"version\":\"1.0\",\"params\":{\"CurrentTemperature\":{\"value\":26.6}}}";
+        pubmessage.payload = "{\"id\":\"123\",\"version\":\"1.0\",\"params\":{\"Temp\":{\"value\":26.6}}}";
         pubmessage.payloadlen = strlen(pubmessage.payload);
         ret = MQTTPublish(&c, (char *)&(mqtt_params.pubtopic), &pubmessage); /* Publish message */
         if (ret != SUCCESSS)
@@ -238,7 +248,7 @@ void do_mqtt(void)
         {
             run_status = ERR;
         }
-        delay_ms(100);
+        Delay_ms(100);
     }
     case RECV:
     {
@@ -247,12 +257,12 @@ void do_mqtt(void)
             mqtt_recv_flag = 0;
             json_decode(mqtt_recv_msg);
         }
-        delay_ms(100);
+        Delay_ms(100);
         break;
     }
     case ERR: /* Running error */
         printf("system ERROR!");
-        delay_ms(1000);
+        Delay_ms(1000);
         break;
 
     default:

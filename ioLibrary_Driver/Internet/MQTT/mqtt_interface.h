@@ -263,7 +263,7 @@ int w5x00_write(Network*, unsigned char*, int, long);
 void w5x00_disconnect(Network*);
 void NewNetwork(Network* n, int sn);
 int ConnectNetwork(Network* n, uint8_t* ip, uint16_t port);
-
+//int Reliable_ConnectNetwork(Network* n, uint8_t* ip, uint16_t port);
 #ifdef __cplusplus
 }
 #endif

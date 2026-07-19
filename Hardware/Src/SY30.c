@@ -1,6 +1,7 @@
 #include "stm32f4xx_hal.h"
 #include "stm32f4xx_hal_i2c.h"
 #include "SY30.h"
+
 /**I2C2 GPIO Configuration
     PB10     ------> I2C2_SCL
     PB11     ------> I2C2_SDA
@@ -10,9 +11,8 @@
 //#define I2Cx I2C2
 // 定义 I2C 句柄
 //I2C_HandleTypeDef hi2c2;
-
 extern I2C_HandleTypeDef hi2c2;     //     这里使用 hi2c2
-#define GY30_I2C_HANDLE     hi2c2  // 1. 改为符合当前芯片的名字
+#define GY30_I2C_HANDLE  hi2c2      // 1. 改为符合当前芯片的名字
 
 /*
 GY30读取光照数据

@@ -1,20 +1,20 @@
 /* USER CODE BEGIN Header */
-/**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2026 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+  /**
+    ******************************************************************************
+    * @file           : main.c
+    * @brief          : Main program body
+    ******************************************************************************
+    * @attention
+    *
+    * Copyright (c) 2026 STMicroelectronics.
+    * All rights reserved.
+    *
+    * This software is licensed under terms that can be found in the LICENSE file
+    * in the root directory of this software component.
+    * If no LICENSE file comes with this software, it is provided AS-IS.
+    *
+    ******************************************************************************
+    */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -28,16 +28,19 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <stdio.h>
-#include "SHT3x.h"  //引入温湿度传感器
-#include "SY30.h"   //光照传感器
-#include "lcd.h"    //TFT LCD屏幕
-#include "W5500.h"  //w5500
-#include "W5500_USER.h" //
-#include "wiz_platform.h"
-#include "wizchip_conf.h"
-#include "wiz_interface.h"
-#include "do_mqtt.h"
+  #include <unistd.h>  // _read 和 _write 必须包含此头文件
+  #include <errno.h>
+  #include "delay.h" //延迟函数
+  #include <stdio.h>
+  #include "SHT3x.h"  //引入温湿度传感器
+  #include "SY30.h"   //光照传感器
+  #include "lcd.h"    //TFT LCD屏幕
+  #include "W5500.h"  //w5500
+  #include "wiz_platform.h"
+  #include "wizchip_conf.h"
+  #include "wiz_interface.h"
+  #include "do_mqtt.h"
+  
 
 /* USER CODE END Includes */
 
@@ -48,7 +51,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+   extern UART_HandleTypeDef huart1; // 确保声明了 huart1
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -60,6 +63,23 @@
 
 /* USER CODE BEGIN PV */
 
+  #define SOCKET_ID 0
+  #define ETHERNET_BUF_MAX_SIZE (1024 * 2)
+
+  /* network information */
+  wiz_NetInfo default_net_info = {
+      .mac = {0x00, 0x08, 0xdc, 0x12, 0x22, 0x12},
+      .ip  = {192, 168, 1, 30},
+      .gw  = {192, 168, 1, 1},
+      .sn  = {255, 255, 255, 0},
+      .dns = {8, 8, 8, 8},
+      .dhcp = NETINFO_DHCP
+  };
+
+  uint8_t ethernet_buf[ETHERNET_BUF_MAX_SIZE] = {0};
+  static uint8_t mqtt_send_ethernet_buf[ETHERNET_BUF_MAX_SIZE] = {0};
+  static uint8_t mqtt_recv_ethernet_buf[ETHERNET_BUF_MAX_SIZE] = {0};
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -69,7 +89,41 @@ void SystemClock_Config(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
-/* USER CODE BEGIN 0 */
+/* USER CODE BEGIN 0 */ 
+
+  /**
+    * @brief  重定向 _read (用于 scanf / getchar，适配 newlib-nano)
+    */
+  int _read(int fd, char *ptr, int len)
+  {
+      // fd == 0 代表 stdin (标准输入)
+      if (fd == 0) 
+      {
+          // 阻塞接收 1 个字符 (与原来的 fgetc 逻辑一致)
+          HAL_UART_Receive(&huart1, (uint8_t *)ptr, 1, HAL_MAX_DELAY);
+          return 1; // 返回成功读取的字节数
+      }
+      
+      errno = EBADF;
+      return -1;
+  }
+
+/**
+  * @brief  重定向 _write (用于 printf，适配 newlib-nano)
+  */
+int _write(int fd, char *ptr, int len)
+{
+    // fd == 1 代表 stdout, fd == 2 代表 stderr
+    if (fd == 1 || fd == 2) 
+    {
+        // 批量发送，效率极高
+        HAL_UART_Transmit(&huart1, (uint8_t *)ptr, len, HAL_MAX_DELAY);
+        return len;
+    }
+    
+    errno = EBADF;
+    return -1;
+}
 
 /* USER CODE END 0 */
 
@@ -81,14 +135,14 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-    u8 lcd_id[12]; // 存放LCD ID字符串
-    float hum = 0.0f;       // 用于存储湿度值
-    float temp = 0.0f;      // 用于存储温度值
-    uint16_t light = 0;     //光照强度
+      u8 lcd_id[12]; // 存放LCD ID字符串
+      float hum = 0.0f;       // 用于存储湿度值
+      float temp = 0.0f;      // 用于存储温度值
+      uint16_t light = 0;     //光照强度
 
-    char str_temp[32];      // 用于格式化温度字符串的缓冲区
-    char str_hum[32];       // 用于格式化湿度字符串的缓冲区 
-    char str_light[32]; 
+      char str_temp[32];      // 用于格式化温度字符串的缓冲区
+      char str_hum[32];       // 用于格式化湿度字符串的缓冲区 
+      char str_light[32]; 
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -105,6 +159,11 @@ int main(void)
 
   /* USER CODE BEGIN SysInit */
 
+    // 4. 【关键修正】DWT 延时初始化，必须放在 SystemClock_Config() 之后！
+    // 此时 SystemCoreClock 已经是准确的 168,000,000
+    Delay_Init();
+    
+    
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -118,113 +177,176 @@ int main(void)
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim2);
-  
-  // 1. 初始化 LCD
-  LCD_Init();           
+    // 可选：打印验证一下，确保时钟配置正确
+    printf("System Core Clock: %lu Hz\r\n", SystemCoreClock); 
+
+    uint8_t test[] = "Hello USART1\r\n";
+    HAL_UART_Transmit(&huart1, test, sizeof(test), 100);
+
     
-  // 2. 设置画笔颜色
-  POINT_COLOR = RED;      
+    HAL_Delay(10);
+    printf("%s MQTT OneNET example\r\n",_WIZCHIP_ID_);
+    
+    /* wizchip init */
+    wizchip_initialize();
+    uint8_t version = getVERSIONR(); // 读取 W5500 版本寄存器 (固定为 0x04)
+    printf("[W5500] VERSIONR = 0x%02X\r\n", version);
+    
+    network_init(ethernet_buf, &default_net_info);
 
-  // 3. 将 LCD ID 格式化到字符串数组
-  sprintf((char *)lcd_id, "LCD ID:%04X", lcddev.id);
-  RTC_TimeTypeDef sTime = {0};
-  RTC_DateTypeDef sDate = {0};
-  char date_str[20];
-  char time_str[20];
+    mqtt_init(SOCKET_ID, mqtt_send_ethernet_buf, mqtt_recv_ethernet_buf);
 
-  // 开机只读取一次
-  HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
-  HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+    // 1. 检查 SPI 硬件是否连通
+      //uint8_t version = getVERSIONR(); 
+      // printf("[1] W5500 Version Register: 0x%02X\r\n", version);
 
-  sprintf(date_str, "20%02d/%02d/%02d", sDate.Year, sDate.Month, sDate.Date);
-  sprintf(time_str, "%02d:%02d:%02d", sTime.Hours, sTime.Minutes, sTime.Seconds);
+      // // 2. 打开 Socket 0
+      // printf("[2] Calling socket(0, TCP, 50000)...\r\n");
+      // uint8_t sock_ret = socket(0, Sn_MR_TCP, 50000, 0x00);
+      // printf("[2] socket() returned: %d\r\n", sock_ret);
 
-  // 显示字符串
-  POINT_COLOR = BLUE;      
-  LCD_ShowString(30, 20, 210, 24, 24, (u8*)"STM32F407 HAL");    
-  LCD_ShowString(30, 50, 200, 16, 16, (u8*)"TFTLCD TEST");
-  LCD_ShowString(30, 70, 200, 16, 16, (u8*)"Makefile + VSCode");
-  LCD_ShowString(30, 90, 200, 16, 16, lcd_id);       // 显示 LCD ID                           
-  //LCD_ShowString(30, 130, 200, 12, 12, (u8*)"2026/07/06");                      // 显示日期 
-  LCD_ShowString(30, 110, 200, 16, 16, (u8*)date_str);//RTC日期
-  LCD_ShowString(30, 130, 200, 16, 16, (u8*)time_str); // 固定显示开机时间
-  // 显示固定的标题（只画一次，避免闪烁）
-  POINT_COLOR = BLUE;
-  LCD_ShowString(30, 150, 200, 24, 24, (u8*)"SHT3x Monitor");
+      // // 3. 检查初始状态
+      // uint8_t status = getSn_SR(0);
+      // printf("[3] Socket 0 Status: 0x%02X (SOCK_INIT)\r\n", status);
 
-  POINT_COLOR = RED;
-  LCD_ShowString(30, 180, 100, 16, 16, (u8*)"Temp:       C");
-  LCD_ShowString(30, 200, 100, 16, 16, (u8*)"Hum :       %RH");
-  // 显示光照强度
-  
-  LCD_ShowString(30, 220, 100, 16, 16, (u8*)"Light:     Lux");       
+      // ================= 【绝对不可省略】发起 TCP 连接并等待 =================
+      // ⚠️ 强制使用 OneNET 明文 IP，放弃 DNS 解析的 mqtts 域名！
+      // uint8_t server_ip[4] = {183, 230, 40, 96}; // OneNET 官方明文 MQTT IP
+      // uint16_t server_port = 1883;               // 必须是 1883
+      
+      // printf("[4] Connecting to OneNET MQTT: %d.%d.%d.%d:%d ...\r\n", 
+      //        server_ip[0], server_ip[1], server_ip[2], server_ip[3], server_port);
+      
+      // // 【关键动作】发起 TCP 三次握手 (拨号)
+      // connect(0, server_ip, server_port); 
+      
+      // // 【关键动作】阻塞等待，直到状态变为 0x17 (SOCK_ESTABLISHED)
+      // uint16_t timeout = 0;
+      // while (getSn_SR(0) != SOCK_ESTABLISHED) 
+      // {
+      //     if (getSn_SR(0) == SOCK_CLOSED) {
+      //         printf("[ERROR] TCP Connection Refused by Server!\r\n");
+      //         break;
+      //     }
+      //     HAL_Delay(10); // 等待 10ms
+      //     timeout++;
+      //     if (timeout > 500) { // 5秒超时
+      //         printf("[ERROR] TCP Connection Timeout!\r\n");
+      //         disconnect(0);
+      //         break;
+      //     }
+      // }
+      
+      // // 检查结果
+      // if (getSn_SR(0) == SOCK_ESTABLISHED) {
+      //     printf("[SUCCESS] TCP Connected! Status: 0x17. Ready for MQTT!\r\n\r\n");
+          
+      //     // ⚠️ 只有在这里，才可以安全地调用你的 MQTT 连接逻辑！
+      //     // 例如： do_mqtt(); 或者 MQTTConnect(&c, &data);
+      // } else {
+      //     printf("[ERROR] TCP Failed. Cannot proceed to MQTT.\r\n\r\n");
+      // }
+      //================================================================
+    // 1. 初始化 LCD
+    LCD_Init();           
+      
+    // 2. 设置画笔颜色
+    POINT_COLOR = RED;      
+
+    // 3. 将 LCD ID 格式化到字符串数组
+    sprintf((char *)lcd_id, "LCD ID:%04X", lcddev.id);
+    RTC_TimeTypeDef sTime = {0};
+    RTC_DateTypeDef sDate = {0};
+    char date_str[20];
+    char time_str[20];
+
+    // 开机只读取一次
+    HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+    HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+
+    sprintf(date_str, "20%02d/%02d/%02d", sDate.Year, sDate.Month, sDate.Date);
+    sprintf(time_str, "%02d:%02d:%02d", sTime.Hours, sTime.Minutes, sTime.Seconds);
+
+    // 显示字符串
+    POINT_COLOR = BLUE;      
+    LCD_ShowString(30, 20, 210, 24, 24, (u8*)"STM32F407 HAL");    
+    LCD_ShowString(30, 50, 200, 16, 16, (u8*)"TFTLCD TEST");
+    LCD_ShowString(30, 70, 200, 16, 16, (u8*)"Makefile + VSCode");
+    LCD_ShowString(30, 90, 200, 16, 16, lcd_id);       // 显示 LCD ID                           
+    //LCD_ShowString(30, 130, 200, 12, 12, (u8*)"2026/07/06");                      // 显示日期 
+    LCD_ShowString(30, 110, 200, 16, 16, (u8*)date_str);//RTC日期
+    LCD_ShowString(30, 130, 200, 16, 16, (u8*)time_str); // 固定显示开机时间
+    // 显示固定的标题（只画一次，避免闪烁）
+    POINT_COLOR = BLUE;
+    LCD_ShowString(30, 150, 200, 24, 24, (u8*)"SHT3x Monitor");
+
+    POINT_COLOR = RED;
+    LCD_ShowString(30, 180, 100, 16, 16, (u8*)"Temp:       C");
+    LCD_ShowString(30, 200, 100, 16, 16, (u8*)"Hum :       %RH");
+    // 显示光照强度
+    
+    LCD_ShowString(30, 220, 100, 16, 16, (u8*)"Light:     Lux");       
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-    
-        // 变量递增
-        // x++;
-        // if (x == 12) x = 0;
-        
-        // 延时 50ms
-        HAL_Delay(50);  
-         // 1. 读取传感器数据
-    if (ReadSHT3x(&hum, &temp)) 
-    {
-        // ================= 核心避坑：浮点数转字符串 =================
-        // 因为 GCC 的 nano.specs 默认不支持 %f，我们必须手动拆分整数和小数部分
-        
-        // 处理温度
-        int t_int = (int)temp;                  // 获取整数部分 (例如 25)
-        int t_dec = (int)((temp - t_int) * 100); // 获取小数部分 (例如 67)
-        if (t_dec < 0) t_dec = -t_dec;          // 防止负数温度导致负号重复 (如 -5.-20)
-        sprintf(str_temp, "%d.%02d", t_int, t_dec); // 拼接成 "25.67"
-
-        // 处理湿度
-        int h_int = (int)hum;
-        int h_dec = (int)((hum - h_int) * 100);
-        if (h_dec < 0) h_dec = -h_dec;
-        sprintf(str_hum, "%d.%02d", h_int, h_dec);
-        // ============================================================
-
-        // 2. 局部刷新显示数据 (使用白色背景覆盖旧数据，防止残影)
-        POINT_COLOR = RED;  // 字体颜色
-        BACK_COLOR = WHITE;   // 背景颜色
-        
-        // 显示温度 (x=60, y=60, 宽度60, 高度16, 字体16)
-        LCD_ShowString(80, 180, 70, 16, 16, (u8*)str_temp); 
-        // 显示湿度 (x=60, y=90, 宽度60, 高度16, 字体16)
-        LCD_ShowString(80, 200, 70, 16, 16, (u8*)str_hum);  
-    } 
-    else 
-    {
-        // 如果读取失败，显示错误提示
-        POINT_COLOR = RED;
-        LCD_ShowString(60, 180, 70, 16, 16, (u8*)"Error");
-        LCD_ShowString(60, 200, 70, 16, 16, (u8*)"Error");
-    }
-    
-  // ================== 2. 读取并显示光照度 (SY30/BH1750) ==================
-    light = GY30_GetData();
-    
-    // 格式化为 5 位整数字符串（例如 "  150" 或 "00150"）
-    sprintf(str_light, "%5d", light);
-    POINT_COLOR = RED;
-    BACK_COLOR = WHITE;
-    // 在 x=80, y=220 处显示光照数值
-    LCD_ShowString(50, 220, 70, 16, 16, (u8*)str_light);
-    // 翻转 LED 表示程序在运行
-    HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_9); // 请根据你的实际 LED 引脚修改！
-    // 延时 1 秒 (SHT3x 单次测量不需要太频繁)
-    HAL_Delay(1000);
-       
+    while (1)
+    { 
+      
+      // 延时 50ms
+      HAL_Delay(50);  
+        // 1. 读取传感器数据
+      if (ReadSHT3x(&hum, &temp)) 
+      {
+          // ================= 核心避坑：浮点数转字符串 =================
+          // 因为 GCC 的 nano.specs 默认不支持 %f，我们必须手动拆分整数和小数部分        
+          // 处理温度
+          int t_int = (int)temp;                  // 获取整数部分 (例如 25)
+          int t_dec = (int)((temp - t_int) * 100); // 获取小数部分 (例如 67)
+          if (t_dec < 0) t_dec = -t_dec;          // 防止负数温度导致负号重复 (如 -5.-20)
+          sprintf(str_temp, "%d.%02d", t_int, t_dec); // 拼接成 "25.67"
+          // 处理湿度
+          int h_int = (int)hum;
+          int h_dec = (int)((hum - h_int) * 100);
+          if (h_dec < 0) h_dec = -h_dec;
+          sprintf(str_hum, "%d.%02d", h_int, h_dec);
+          // ============================================================
+          // 2. 局部刷新显示数据 (使用白色背景覆盖旧数据，防止残影)
+          POINT_COLOR = RED;  // 字体颜色
+          BACK_COLOR = WHITE;   // 背景颜色
+          
+          // 显示温度 (x=60, y=60, 宽度60, 高度16, 字体16)
+          LCD_ShowString(80, 180, 70, 16, 16, (u8*)str_temp); 
+          // 显示湿度 (x=60, y=90, 宽度60, 高度16, 字体16)
+          LCD_ShowString(80, 200, 70, 16, 16, (u8*)str_hum);  
+      } 
+      else 
+      {
+          // 如果读取失败，显示错误提示
+          POINT_COLOR = RED;
+          LCD_ShowString(60, 180, 70, 16, 16, (u8*)"Error");
+          LCD_ShowString(60, 200, 70, 16, 16, (u8*)"Error");
+      }
+      
+    // ================== 2. 读取并显示光照度 (SY30/BH1750) ==================
+      light = GY30_GetData();
+      
+      // 格式化为 5 位整数字符串（例如 "  150" 或 "00150"）
+      sprintf(str_light, "%5d", light);
+      POINT_COLOR = RED;
+      BACK_COLOR = WHITE;
+      // 在 x=80, y=220 处显示光照数值
+      LCD_ShowString(50, 220, 70, 16, 16, (u8*)str_light);
+      // 翻转 LED 表示程序在运行
+      HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_9); // 请根据你的实际 LED 引脚修改！
+      // 延时 1 秒 (SHT3x 单次测量不需要太频繁)
+      HAL_Delay(1000);
+      // 1. 核心：循环处理 MQTT 状态机 (连接、订阅、发布、保活)
+      do_mqtt(); 
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  }
+    }
   /* USER CODE END 3 */
 }
 
@@ -250,7 +372,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = 25;
+  RCC_OscInitStruct.PLL.PLLM = 8;
   RCC_OscInitStruct.PLL.PLLN = 336;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 4;
@@ -285,11 +407,11 @@ void SystemClock_Config(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
+    /* User can add his own implementation to report the HAL error return state */
+    __disable_irq();
+    while (1)
+    {
+    }
   /* USER CODE END Error_Handler_Debug */
 }
 #ifdef USE_FULL_ASSERT
@@ -303,8 +425,8 @@ void Error_Handler(void)
 void assert_failed(uint8_t *file, uint32_t line)
 {
   /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+    /* User can add his own implementation to report the file name and line number,
+      ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */

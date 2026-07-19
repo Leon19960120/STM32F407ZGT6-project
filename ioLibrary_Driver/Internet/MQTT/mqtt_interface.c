@@ -43,6 +43,8 @@
 #include "mqtt_interface.h"
 #include "wizchip_conf.h"
 #include "socket.h"
+// #include "main.h"
+ #include "delay.h"
 
 unsigned long MilliTimer;
 
@@ -180,3 +182,53 @@ int ConnectNetwork(Network* n, uint8_t* ip, uint16_t port)
 
 	return SOCK_OK;
 }
+
+// /**
+//  * @brief 可靠的 TCP 连接函数 (彻底替代原有有缺陷的 ConnectNetwork)
+//  * @param n: Network 结构体指针
+//  * @param ip: 服务器 IP 数组
+//  * @param port: 服务器端口
+//  * @retval 0: 连接成功, -1: 连接失败
+//  */
+// int Reliable_ConnectNetwork(Network* n, uint8_t* ip, uint16_t port)
+// {
+//     uint16_t myport = 12345; // 本地随机端口
+//     uint16_t timeout = 0;
+//     uint8_t sock_status;
+
+//     printf("[TCP] Opening Socket %d...\r\n", n->my_socket);
+//     if (socket(n->my_socket, Sn_MR_TCP, myport, 0) != n->my_socket) {
+//         printf("[TCP] ERROR: socket() failed!\r\n");
+//         return -1;
+//     }
+
+//     printf("[TCP] Connecting to %d.%d.%d.%d:%d ...\r\n", ip[0], ip[1], ip[2], ip[3], port);
+//     if (connect(n->my_socket, ip, port) != SOCK_OK) {
+//         printf("[TCP] ERROR: connect() command failed!\r\n");
+//         return -1;
+//     }
+
+//     // ⚠️ 核心修复：循环等待 TCP 三次握手真正完成 (SOCK_ESTABLISHED = 0x17)
+//     while (1) {
+//         sock_status = getSn_SR(n->my_socket);
+        
+//         if (sock_status == SOCK_ESTABLISHED) {
+//             printf("[TCP] SUCCESS: TCP Connected! Status: 0x17\r\n");
+//             return 0; // 真正连接成功，返回 0
+//         }
+        
+//         if (sock_status == SOCK_CLOSED) {
+//             printf("[TCP] ERROR: Connection Refused by Server!\r\n");
+//             disconnect(n->my_socket);
+//             return -1;
+//         }
+        
+//         Delay_ms(10); // 延时 10ms 避免 CPU 空转
+//         timeout++;
+//         if (timeout > 500) { // 5秒超时强制退出，绝不卡死
+//             printf("[TCP] ERROR: Connection Timeout (5s)!\r\n");
+//             disconnect(n->my_socket);
+//             return -1;
+//         }
+//     }
+// }

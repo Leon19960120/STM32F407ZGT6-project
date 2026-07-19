@@ -10,70 +10,38 @@
 
 #include "main.h"
 
-static uint8_t UsNumber = 0;
-static uint16_t MsNumber = 0;
+
 
 extern SPI_HandleTypeDef hspi1;
 extern UART_HandleTypeDef huart1;
 extern TIM_HandleTypeDef  htim2;
 
 
-// void debug_usart_init(void)
+// int fputc(int ch, FILE *f)
 // {
-//     GPIO_InitTypeDef GPIO_InitStructure;
-//     USART_InitTypeDef USART_InitStructure;
-//     /* config USART1 clock */
-//     RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1 | RCC_APB2Periph_GPIOA, ENABLE);
-
-//     /* USART1 GPIO config */
-//     /* Configure USART1 Tx (PA.09) as alternate function push-pull */
-//     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
-//     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
-//     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-//     GPIO_Init(GPIOA, &GPIO_InitStructure);
-//     /* Configure USART1 Rx (PA.10) as input floating */
-//     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
-//     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-//     GPIO_Init(GPIOA, &GPIO_InitStructure);
-	
-//     /* USART1 mode config */
-//     USART_InitStructure.USART_BaudRate = 115200;
-//     USART_InitStructure.USART_WordLength = USART_WordLength_8b;
-//     USART_InitStructure.USART_StopBits = USART_StopBits_1;
-//     USART_InitStructure.USART_Parity = USART_Parity_No;
-//     USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
-//     USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
-//     USART_Init(USART1, &USART_InitStructure);
-		
-//     USART_Cmd(USART1, ENABLE);
+//     /* Redirect hal library function printf to USART1 */
+//     //USART1->SR;
+//     //使用hal库发送单个字符，超时时间位最大值
+//     HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
+//     // /* Wait for delivery to complete */
+//     // while (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET);
+//     return (ch);
 // }
 
-
-int fputc(int ch, FILE *f)
-{
-    /* Redirect hal library function printf to USART1 */
-    //USART1->SR;
-    //使用hal库发送单个字符，超时时间位最大值
-    HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
-    // /* Wait for delivery to complete */
-    // while (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET);
-    return (ch);
-}
-
-/**
-  * @brief  重定向 c 库函数 scanf/getchar 到 USART1
-  */
-/* Redirecting the hal library function scanf to USART1 */
-int fgetc(FILE *f)
-{
-    /* Waiting for USART1 to enter data */
-    // while (USART_GetFlagStatus(USART1, USART_FLAG_RXNE) == RESET);
-    // return (int)USART_ReceiveData(USART1);
-    uint8_t ch = 0;
-    // 使用 HAL 库函数接收单个字符，阻塞等待直到收到数据
-    HAL_UART_Receive(&huart1, &ch, 1, HAL_MAX_DELAY);
-    return ch;
-}
+// /**
+//   * @brief  重定向 c 库函数 scanf/getchar 到 USART1
+//   */
+// /* Redirecting the hal library function scanf to USART1 */
+// int fgetc(FILE *f)
+// {
+//     /* Waiting for USART1 to enter data */
+//     // while (USART_GetFlagStatus(USART1, USART_FLAG_RXNE) == RESET);
+//     // return (int)USART_ReceiveData(USART1);
+//     uint8_t ch = 0;
+//     // 使用 HAL 库函数接收单个字符，阻塞等待直到收到数据
+//     HAL_UART_Receive(&huart1, &ch, 1, HAL_MAX_DELAY);
+//     return ch;
+// }
 
 // /*
 //  * TIM_Period / Auto Reload Register(ARR) = 1000   TIM_Prescaler--71 
@@ -107,116 +75,6 @@ int fgetc(FILE *f)
 
 
 
-// void wiz_spi_init(void)
-// {
-//     RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);
-//     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB|RCC_APB2Periph_GPIOD, ENABLE);
-//     GPIO_InitTypeDef GPIO_InitStructure;
-//     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13 | GPIO_Pin_14 | GPIO_Pin_15;
-//     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
-//     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-//     GPIO_Init(GPIOB, &GPIO_InitStructure);
-	
-//     SPI_InitTypeDef SPI_InitStructure;
-//     SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;
-//     SPI_InitStructure.SPI_Mode = SPI_Mode_Master;
-//     SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b;
-//     SPI_InitStructure.SPI_CPOL = SPI_CPOL_Low;
-//     SPI_InitStructure.SPI_CPHA = SPI_CPHA_1Edge;
-//     SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;
-//     SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_8;
-//     SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;
-//     SPI_Init(SPI2, &SPI_InitStructure);
-//     SPI_Cmd(SPI2, ENABLE);
-	
-//     /* PD_7 -> CS */
-//     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-//     GPIO_InitStructure.GPIO_Pin = WIZ_SCS_PIN;
-//     GPIO_Init(WIZ_SCS_PORT, &GPIO_InitStructure);
-//     GPIO_SetBits(WIZ_SCS_PORT, WIZ_SCS_PIN);
-// }
-
-// void wiz_rst_int_init(void)
-// {
-//     GPIO_InitTypeDef GPIO_InitStructure;
-
-//     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOD,ENABLE);
-//     /* PD_08 -> RST */
-//     GPIO_InitStructure.GPIO_Pin = WIZ_RST_PIN;
-//     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-//     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-//     GPIO_Init(WIZ_RST_PORT, &GPIO_InitStructure);
-//     GPIO_SetBits(WIZ_RST_PORT, WIZ_RST_PIN);
-
-//     /* PD_09 -> INT */
-//     GPIO_InitStructure.GPIO_Pin = WIZ_INT_PIN;
-//     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
-//     GPIO_Init(WIZ_INT_PORT, &GPIO_InitStructure);
-// }
-
-// /**
-//  * @brief   delay init
-//  * @param   none
-//  * @return  none
-//  */
-// void delay_init(void)
-// {
-
-// 	SysTick_CLKSourceConfig(SysTick_CLKSource_HCLK_Div8);
-// 	UsNumber = SystemCoreClock / 8000000;
-// 	MsNumber = (u16)UsNumber * 1000;
-// }
-
-/**
- * @brief   delay us
- * @param   none
- * @return  none
- */
-void delay_us(uint32_t nus)
-{
-	uint32_t temp;
-	SysTick->LOAD = nus * UsNumber;
-	SysTick->VAL = 0x00;
-	SysTick->CTRL |= SysTick_CTRL_ENABLE_Msk;
-	do
-	{
-		temp = SysTick->CTRL;
-	} while ((temp & 0x01) && !(temp & (1 << 16)));
-	SysTick->CTRL &= ~SysTick_CTRL_ENABLE_Msk;
-	SysTick->VAL = 0X00;
-}
-
-// /**
-//  * @brief   delay ms
-//  * @param   none
-//  * @return  none
-//  */
-// void delay_ms(uint32_t nms)
-// {
-// 	uint32_t temp;
-// 	SysTick->LOAD = (uint32_t)nms * MsNumber;
-// 	SysTick->VAL = 0x00;
-// 	SysTick->CTRL |= SysTick_CTRL_ENABLE_Msk;
-// 	do
-// 	{
-// 		temp = SysTick->CTRL;
-// 	} while ((temp & 0x01) && !(temp & (1 << 16)));
-// 	SysTick->CTRL &= ~SysTick_CTRL_ENABLE_Msk;
-// 	SysTick->VAL = 0X00;
-// }
-
-// /**
-//  * @brief   delay s
-//  * @param   none
-//  * @return  none
-//  */
-// void delay_s(uint32_t ns)
-// {
-// 		while(ns--)
-// 		{
-// 				delay_ms(1000);
-// 		}
-// }
 
 /**
  * @brief   SPI select wizchip
@@ -318,6 +176,9 @@ void wizchip_read_buff(uint8_t *buf, uint16_t len)
     }
 }
 
+/* ========================================================================= */
+/* 3. W5500 硬件控制                                                         */
+/* ========================================================================= */
 /**
  * @brief   hardware reset wizchip
  * @param   none
@@ -325,20 +186,12 @@ void wizchip_read_buff(uint8_t *buf, uint16_t len)
  */
 void wizchip_reset(void)
 {
-    // GPIO_SetBits(WIZ_RST_PORT,WIZ_RST_PIN);
-    // delay_ms(10);
-    // GPIO_ResetBits(WIZ_RST_PORT,WIZ_RST_PIN);
-    // delay_ms(10);
-    // GPIO_SetBits(WIZ_RST_PORT,WIZ_RST_PIN);
-    // delay_ms(10);
-    // 1. 硬件复位 W5500 (拉低 -> 延时 -> 拉高)
+    
     HAL_GPIO_WritePin(W5500_RST_GPIO_Port, W5500_RST_Pin, GPIO_PIN_RESET); // 拉低复位
     HAL_Delay(100); // 延时 100ms
     HAL_GPIO_WritePin(W5500_RST_GPIO_Port, W5500_RST_Pin, GPIO_PIN_SET);   // 拉高结束复位
     HAL_Delay(100); // 等待芯片启动
-
-    // 2. 开启你的定时器中断（之前提到的）
-    //HAL_TIM_Base_Start_IT(&htim2);
+    
 }
 
 /**
