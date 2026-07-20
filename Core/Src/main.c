@@ -40,6 +40,7 @@
   #include "wizchip_conf.h"
   #include "wiz_interface.h"
   #include "do_mqtt.h"
+  #include "display.h"
   
 
 /* USER CODE END Includes */
@@ -159,9 +160,9 @@ int main(void)
 
   /* USER CODE BEGIN SysInit */
 
-    // 4. 【关键修正】DWT 延时初始化，必须放在 SystemClock_Config() 之后！
-    // 此时 SystemCoreClock 已经是准确的 168,000,000
-    Delay_Init();
+  // 4. 【关键修正】DWT 延时初始化，必须放在 SystemClock_Config() 之后！
+  // 此时 SystemCoreClock 已经是准确的 168,000,000
+  Delay_Init();
     
     
   /* USER CODE END SysInit */
@@ -177,24 +178,24 @@ int main(void)
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim2);
-    // 可选：打印验证一下，确保时钟配置正确
-    printf("System Core Clock: %lu Hz\r\n", SystemCoreClock); 
+  // 可选：打印验证一下，确保时钟配置正确
+  printf("System Core Clock: %u Hz\r\n", SystemCoreClock); 
 
-    uint8_t test[] = "Hello USART1\r\n";
-    HAL_UART_Transmit(&huart1, test, sizeof(test), 100);
+  uint8_t test[] = "Hello USART1\r\n";
+  HAL_UART_Transmit(&huart1, test, sizeof(test), 100);
 
-    
-    HAL_Delay(10);
-    printf("%s MQTT OneNET example\r\n",_WIZCHIP_ID_);
-    
-    /* wizchip init */
-    wizchip_initialize();
-    uint8_t version = getVERSIONR(); // 读取 W5500 版本寄存器 (固定为 0x04)
-    printf("[W5500] VERSIONR = 0x%02X\r\n", version);
-    
-    network_init(ethernet_buf, &default_net_info);
+  
+  HAL_Delay(10);
+  printf("%s MQTT OneNET example\r\n",_WIZCHIP_ID_);
+  
+  /* wizchip init */
+  wizchip_initialize();
+  uint8_t version = getVERSIONR(); // 读取 W5500 版本寄存器 (固定为 0x04)
+  printf("[W5500] VERSIONR = 0x%02X\r\n", version);
+  
+  network_init(ethernet_buf, &default_net_info);
 
-    mqtt_init(SOCKET_ID, mqtt_send_ethernet_buf, mqtt_recv_ethernet_buf);
+  mqtt_init(SOCKET_ID, mqtt_send_ethernet_buf, mqtt_recv_ethernet_buf);
 
     // 1. 检查 SPI 硬件是否连通
       //uint8_t version = getVERSIONR(); 
@@ -247,19 +248,21 @@ int main(void)
       //     printf("[ERROR] TCP Failed. Cannot proceed to MQTT.\r\n\r\n");
       // }
       //================================================================
+
     // 1. 初始化 LCD
-    LCD_Init();           
-      
+    LCD_Init();                
     // 2. 设置画笔颜色
-    POINT_COLOR = RED;      
+    POINT_COLOR = RED;     
 
     // 3. 将 LCD ID 格式化到字符串数组
     sprintf((char *)lcd_id, "LCD ID:%04X", lcddev.id);
+
     RTC_TimeTypeDef sTime = {0};
     RTC_DateTypeDef sDate = {0};
     char date_str[20];
     char time_str[20];
 
+    display_init();
     // 开机只读取一次
     HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
     HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
@@ -267,25 +270,6 @@ int main(void)
     sprintf(date_str, "20%02d/%02d/%02d", sDate.Year, sDate.Month, sDate.Date);
     sprintf(time_str, "%02d:%02d:%02d", sTime.Hours, sTime.Minutes, sTime.Seconds);
 
-    // 显示字符串
-    POINT_COLOR = BLUE;      
-    LCD_ShowString(30, 20, 210, 24, 24, (u8*)"STM32F407 HAL");    
-    LCD_ShowString(30, 50, 200, 16, 16, (u8*)"TFTLCD TEST");
-    LCD_ShowString(30, 70, 200, 16, 16, (u8*)"Makefile + VSCode");
-    LCD_ShowString(30, 90, 200, 16, 16, lcd_id);       // 显示 LCD ID                           
-    //LCD_ShowString(30, 130, 200, 12, 12, (u8*)"2026/07/06");                      // 显示日期 
-    LCD_ShowString(30, 110, 200, 16, 16, (u8*)date_str);//RTC日期
-    LCD_ShowString(30, 130, 200, 16, 16, (u8*)time_str); // 固定显示开机时间
-    // 显示固定的标题（只画一次，避免闪烁）
-    POINT_COLOR = BLUE;
-    LCD_ShowString(30, 150, 200, 24, 24, (u8*)"SHT3x Monitor");
-
-    POINT_COLOR = RED;
-    LCD_ShowString(30, 180, 100, 16, 16, (u8*)"Temp:       C");
-    LCD_ShowString(30, 200, 100, 16, 16, (u8*)"Hum :       %RH");
-    // 显示光照强度
-    
-    LCD_ShowString(30, 220, 100, 16, 16, (u8*)"Light:     Lux");       
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -310,39 +294,48 @@ int main(void)
           int h_dec = (int)((hum - h_int) * 100);
           if (h_dec < 0) h_dec = -h_dec;
           sprintf(str_hum, "%d.%02d", h_int, h_dec);
+          
           // ============================================================
           // 2. 局部刷新显示数据 (使用白色背景覆盖旧数据，防止残影)
           POINT_COLOR = RED;  // 字体颜色
-          BACK_COLOR = WHITE;   // 背景颜色
+          BACK_COLOR = BLACK;   // 背景颜色
           
           // 显示温度 (x=60, y=60, 宽度60, 高度16, 字体16)
-          LCD_ShowString(80, 180, 70, 16, 16, (u8*)str_temp); 
+          //LCD_ShowString(80, 180, 70, 16, 16, (u8*)str_temp); 
           // 显示湿度 (x=60, y=90, 宽度60, 高度16, 字体16)
-          LCD_ShowString(80, 200, 70, 16, 16, (u8*)str_hum);  
+          //LCD_ShowString(80, 200, 70, 16, 16, (u8*)str_hum);  
       } 
       else 
       {
           // 如果读取失败，显示错误提示
           POINT_COLOR = RED;
-          LCD_ShowString(60, 180, 70, 16, 16, (u8*)"Error");
-          LCD_ShowString(60, 200, 70, 16, 16, (u8*)"Error");
+          //LCD_ShowString(60, 180, 70, 16, 16, (u8*)"Error");
+          //(60, 200, 70, 16, 16, (u8*)"Error");
       }
       
+
     // ================== 2. 读取并显示光照度 (SY30/BH1750) ==================
-      light = GY30_GetData();
-      
+      light = GY30_GetData();      
       // 格式化为 5 位整数字符串（例如 "  150" 或 "00150"）
       sprintf(str_light, "%5d", light);
-      POINT_COLOR = RED;
-      BACK_COLOR = WHITE;
+      
       // 在 x=80, y=220 处显示光照数值
-      LCD_ShowString(50, 220, 70, 16, 16, (u8*)str_light);
-      // 翻转 LED 表示程序在运行
-      HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_9); // 请根据你的实际 LED 引脚修改！
+      display_refresh(str_temp, str_hum, str_light);
+
+      //LCD_ShowString(50, 220, 70, 16, 16, (u8*)str_light);
+        // 显示固定的标题（只画一次，避免闪烁）
+      POINT_COLOR = RED;
+      LCD_ShowString(30, 90, 200, 16, 16, lcd_id);       // 显示 LCD ID                           
+      //LCD_ShowString(30, 130, 200, 12, 12, (u8*)"2026/07/06");                      // 显示日期 
+      LCD_ShowString(30, 110, 200, 16, 16, (u8*)date_str);//RTC日期
+      LCD_ShowString(30, 130, 200, 16, 16, (u8*)time_str); // 固定显示开机时间
+   
       // 延时 1 秒 (SHT3x 单次测量不需要太频繁)
       HAL_Delay(1000);
       // 1. 核心：循环处理 MQTT 状态机 (连接、订阅、发布、保活)
       do_mqtt(); 
+      // 翻转 LED 表示程序在运行
+      HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_9); // 请根据你的实际 LED 引脚修改！
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

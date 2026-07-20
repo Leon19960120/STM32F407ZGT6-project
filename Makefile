@@ -100,7 +100,8 @@ ioLibrary_Driver/Internet/MQTT/MQTTPacket/src/MQTTUnsubscribeServer.c \
 Core/Src/tim.c \
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim.c \
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim_ex.c \
-Utils/delay.c
+Utils/delay.c \
+User/display/display.c
 
 # ASM sources
 ASM_SOURCES =  \
@@ -179,6 +180,7 @@ C_INCLUDES =  \
 -IUser/MQTT \
 -IUser/wiz_interface \
 -IUser/wiz_platform \
+-IUser/display \
 -IUtils/
 
 
