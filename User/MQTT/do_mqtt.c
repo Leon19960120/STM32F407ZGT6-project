@@ -11,6 +11,10 @@
 
 #define MQTT_ETHERNET_MAX_SIZE (1024 * 2)
 
+extern float temp;
+extern float hum;
+extern uint16_t light;
+
 MQTTClient c = {0};
 Network n = {0};
 int connOK;
@@ -228,8 +232,14 @@ void do_mqtt(void)
     case PUB_MESSAGE:
     {
         pubmessage.qos = QOS0;
-        pubmessage.payload = "{\"id\":\"123\",\"version\":\"1.0\",\"params\":{\"Temp\":{\"value\":26.6}}}";
+       
+        char payload_buf[128];
+        sprintf(payload_buf, 
+        "{\"id\":\"123\",\"version\":\"1.0\",\"params\":{\"Temp\":{\"value\":%.1f},\"humidity\":{\"value\":%d}}}",temp,(int)hum);
+        //pubmessage.payload = "{\"id\":\"123\",\"version\":\"1.0\",\"params\":{\"Temp\":{\"value\":26.8},\"humidity\":{\"value\":60}}}";
+        pubmessage.payload = payload_buf;
         pubmessage.payloadlen = strlen(pubmessage.payload);
+
         ret = MQTTPublish(&c, (char *)&(mqtt_params.pubtopic), &pubmessage); /* Publish message */
         if (ret != SUCCESSS)
         {
@@ -249,6 +259,8 @@ void do_mqtt(void)
             run_status = ERR;
         }
         Delay_ms(100);
+        run_status = PUB_MESSAGE; // ← 发完心跳后继续发数据
+        break;    // ← 一定要加 break！
     }
     case RECV:
     {

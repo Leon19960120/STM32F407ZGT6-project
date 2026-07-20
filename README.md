@@ -208,7 +208,6 @@ STM32_Programmer_CLI -c port=swd -w build/sht35.bin 0x08000000 -v -rst
 - [ ] MQTT payload 仍为固定值（26.6°C），未与 SHT3x 实时数据联动
 - [ ] OneNET 凭证（passwd）硬编码，需定期更新 SHA1 签名
 - [ ] `wiz_platform.c` 中仍有部分旧 F103 注释代码待清理
-- [ ] `NET/` 目录存在冗余代码（旧版 HTTP/ESP8266/MQTTKit），建议清理或标记 deprecated
 - [ ] ESP8266 WiFi 方案尚未集成，当前仅支持 W5500 以太网
 
 ## 参考资源

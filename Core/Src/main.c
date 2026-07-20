@@ -67,6 +67,10 @@
   #define SOCKET_ID 0
   #define ETHERNET_BUF_MAX_SIZE (1024 * 2)
 
+   float hum = 0.0f;       // 用于存储湿度值
+  float temp = 0.0f;      // 用于存储温度值
+      uint16_t light = 0;     //光照强度
+
   /* network information */
   wiz_NetInfo default_net_info = {
       .mac = {0x00, 0x08, 0xdc, 0x12, 0x22, 0x12},
@@ -137,10 +141,7 @@ int main(void)
 
   /* USER CODE BEGIN 1 */
       u8 lcd_id[12]; // 存放LCD ID字符串
-      float hum = 0.0f;       // 用于存储湿度值
-      float temp = 0.0f;      // 用于存储温度值
-      uint16_t light = 0;     //光照强度
-
+     
       char str_temp[32];      // 用于格式化温度字符串的缓冲区
       char str_hum[32];       // 用于格式化湿度字符串的缓冲区 
       char str_light[32]; 

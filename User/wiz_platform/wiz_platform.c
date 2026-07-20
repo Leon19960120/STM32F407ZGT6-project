@@ -10,8 +10,6 @@
 
 #include "main.h"
 
-
-
 extern SPI_HandleTypeDef hspi1;
 extern UART_HandleTypeDef huart1;
 extern TIM_HandleTypeDef  htim2;
@@ -138,7 +136,6 @@ uint8_t wizchip_read_byte(void)
     // return SPI_I2S_ReceiveData(SPI2);
     uint8_t dat_tx = 0xFF; // Dummy Byte (哑字节)
     uint8_t dat_rx = 0;    // 用于存放接收到的数据
-    
     // 发送 0xFF 的同时，接收 W5500 返回的真实数据
     // 发送 0xFF 是为了让 STM32 产生 8 个时钟脉冲，W5500 才能在这 8 个时钟内把数据移出来
     HAL_SPI_TransmitReceive(&hspi1, &dat_tx, &dat_rx, 1, HAL_MAX_DELAY);
