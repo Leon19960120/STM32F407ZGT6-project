@@ -44,11 +44,11 @@ void display_refresh(u8 *str_temp, u8 *str_hum, u8 *str_light)
     //LCD_ShowString(80, 200, 70, 16, 16, (u8*)str_hum); 
 
     // 温度 y=180，宽度70，高度16
-    LCD_ShowString(90, 180, 70, 16, 16, str_temp);
+    LCD_ShowString(85, 180, 70, 16, 16, str_temp);
     // 湿度 y=200，宽度70，高度16
-    LCD_ShowString(90, 200, 70, 16, 16, str_hum);
+    LCD_ShowString(85, 200, 70, 16, 16, str_hum);
     // 光照 y=220，宽度70，高度16
-    LCD_ShowString(70, 220, 70, 16, 16, str_light);
+    LCD_ShowString(85, 220, 70, 16, 16, str_light);
 }
 
 void display_time(char* date_str, char* time_str){

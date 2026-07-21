@@ -185,6 +185,12 @@ STM32_Programmer_CLI -c port=swd -w build/sht35.bin 0x08000000 -v -rst
 | Phy_Addr | 手动配置 | MAC 地址 |
 | IP_Addr | 手动配置 | 本机 IP |
 
+### 网络注意事项
+
+- OneNET MQTT 端口 `1883` 为 TLS 加密端口（域名含 `s`），W5500 不支持 TLS 握手
+- 测试发现路由器网络可正常连接，手机热点网络可能被运营商封锁端口导致 TCP 拒绝
+- 如需在非 TLS 环境下调试，可尝试 OneNET 明文端口 `6002`（需确认设备是否支持）
+
 ## 编译环境
 
 - **MCU**: STM32F407ZGT6（Cortex-M4F，带 FPU）
@@ -192,7 +198,7 @@ STM32_Programmer_CLI -c port=swd -w build/sht35.bin 0x08000000 -v -rst
 - **标准库**: STM32 HAL Library v1.6+
 - **构建工具**: GNU Make
 - **IDE**: VSCode + CMake/Makefile 插件（可选）
-- **调试器**: ST-Link / J-Link + OpenOCD
+- **调试器**: ST-Link + OpenOCD
 
 ### 编译器选项
 
@@ -205,7 +211,7 @@ STM32_Programmer_CLI -c port=swd -w build/sht35.bin 0x08000000 -v -rst
 
 ## 已知问题与待办
 
-- [ ] MQTT payload 仍为固定值（26.6°C），未与 SHT3x 实时数据联动
+- [ ] ~~MQTT payload 仍为固定值（26.6°C），未与 SHT3x 实时数据联动~~
 - [ ] OneNET 凭证（passwd）硬编码，需定期更新 SHA1 签名
 - [ ] `wiz_platform.c` 中仍有部分旧 F103 注释代码待清理
 - [ ] ESP8266 WiFi 方案尚未集成，当前仅支持 W5500 以太网

@@ -30,13 +30,12 @@
 /* USER CODE BEGIN Includes */
   #include <unistd.h>  // _read 和 _write 必须包含此头文件
   #include <errno.h>
+   #include <stdio.h>
   #include "delay.h" //延迟函数
-  #include <stdio.h>
   #include "SHT3x.h"  //引入温湿度传感器
   #include "SY30.h"   //光照传感器
   #include "lcd.h"    //TFT LCD屏幕
   #include "W5500.h"  //w5500
-  #include "wiz_platform.h"
   #include "wizchip_conf.h"
   #include "wiz_interface.h"
   #include "do_mqtt.h"
@@ -67,9 +66,9 @@
   #define SOCKET_ID 0
   #define ETHERNET_BUF_MAX_SIZE (1024 * 2)
 
-   float hum = 0.0f;       // 用于存储湿度值
+  float hum = 0.0f;       // 用于存储湿度值
   float temp = 0.0f;      // 用于存储温度值
-      uint16_t light = 0;     //光照强度
+  uint16_t light = 0;     //光照强度
 
   /* network information */
   wiz_NetInfo default_net_info = {
@@ -193,6 +192,7 @@ int main(void)
   
   /* wizchip init */
   wizchip_initialize();
+
   uint8_t version = getVERSIONR(); // 读取 W5500 版本寄存器 (固定为 0x04)
   printf("[W5500] VERSIONR = 0x%02X\r\n", version);
   
@@ -200,74 +200,22 @@ int main(void)
 
   mqtt_init(SOCKET_ID, mqtt_send_ethernet_buf, mqtt_recv_ethernet_buf);
 
-  // 1. 检查 SPI 硬件是否连通
-    //uint8_t version = getVERSIONR(); 
-    // printf("[1] W5500 Version Register: 0x%02X\r\n", version);
+  // 1. 初始化 LCD
+  LCD_Init();                
+  // 2. 设置画笔颜色
+  POINT_COLOR = RED;     
 
-    // // 2. 打开 Socket 0
-    // printf("[2] Calling socket(0, TCP, 50000)...\r\n");
-    // uint8_t sock_ret = socket(0, Sn_MR_TCP, 50000, 0x00);
-    // printf("[2] socket() returned: %d\r\n", sock_ret);
+  // 3. 将 LCD ID 格式化到字符串数组
+  sprintf((char *)lcd_id, "LCD ID:%04X", lcddev.id);
+  // 显示固定的标题（只画一次，避免闪烁）
+    POINT_COLOR = RED;
+    LCD_ShowString(30, 90, 200, 16, 16, lcd_id);       // 显示 LCD ID   
+  RTC_TimeTypeDef sTime = {0};
+  RTC_DateTypeDef sDate = {0};
+  char date_str[20];
+  char time_str[20];
 
-    // // 3. 检查初始状态
-    // uint8_t status = getSn_SR(0);
-    // printf("[3] Socket 0 Status: 0x%02X (SOCK_INIT)\r\n", status);
-
-    // ================= 【绝对不可省略】发起 TCP 连接并等待 =================
-    // ⚠️ 强制使用 OneNET 明文 IP，放弃 DNS 解析的 mqtts 域名！
-    // uint8_t server_ip[4] = {183, 230, 40, 96}; // OneNET 官方明文 MQTT IP
-    // uint16_t server_port = 1883;               // 必须是 1883
-    
-    // printf("[4] Connecting to OneNET MQTT: %d.%d.%d.%d:%d ...\r\n", 
-    //        server_ip[0], server_ip[1], server_ip[2], server_ip[3], server_port);
-    
-    // // 【关键动作】发起 TCP 三次握手 (拨号)
-    // connect(0, server_ip, server_port); 
-    
-    // // 【关键动作】阻塞等待，直到状态变为 0x17 (SOCK_ESTABLISHED)
-    // uint16_t timeout = 0;
-    // while (getSn_SR(0) != SOCK_ESTABLISHED) 
-    // {
-    //     if (getSn_SR(0) == SOCK_CLOSED) {
-    //         printf("[ERROR] TCP Connection Refused by Server!\r\n");
-    //         break;
-    //     }
-    //     HAL_Delay(10); // 等待 10ms
-    //     timeout++;
-    //     if (timeout > 500) { // 5秒超时
-    //         printf("[ERROR] TCP Connection Timeout!\r\n");
-    //         disconnect(0);
-    //         break;
-    //     }
-    // }
-    
-    // // 检查结果
-    // if (getSn_SR(0) == SOCK_ESTABLISHED) {
-    //     printf("[SUCCESS] TCP Connected! Status: 0x17. Ready for MQTT!\r\n\r\n");
-        
-    //     // ⚠️ 只有在这里，才可以安全地调用你的 MQTT 连接逻辑！
-    //     // 例如： do_mqtt(); 或者 MQTTConnect(&c, &data);
-    // } else {
-    //     printf("[ERROR] TCP Failed. Cannot proceed to MQTT.\r\n\r\n");
-    // }
-    //================================================================
-
-    // 1. 初始化 LCD
-    LCD_Init();                
-    // 2. 设置画笔颜色
-    POINT_COLOR = RED;     
-
-    // 3. 将 LCD ID 格式化到字符串数组
-    sprintf((char *)lcd_id, "LCD ID:%04X", lcddev.id);
-    // 显示固定的标题（只画一次，避免闪烁）
-      POINT_COLOR = RED;
-      LCD_ShowString(30, 90, 200, 16, 16, lcd_id);       // 显示 LCD ID   
-    RTC_TimeTypeDef sTime = {0};
-    RTC_DateTypeDef sDate = {0};
-    char date_str[20];
-    char time_str[20];
-
-    display_init();
+  display_init();
     
   /* USER CODE END 2 */
 
@@ -287,33 +235,32 @@ int main(void)
           // ================= 核心避坑：浮点数转字符串 =================
           // 因为 GCC 的 nano.specs 默认不支持 %f，我们必须手动拆分整数和小数部分        
           // 处理温度
-          int t_int = (int)temp;                  // 获取整数部分 (例如 25)
-          int t_dec = (int)((temp - t_int) * 100); // 获取小数部分 (例如 67)
-          if (t_dec < 0) t_dec = -t_dec;          // 防止负数温度导致负号重复 (如 -5.-20)
-          sprintf(str_temp, "%d.%02d", t_int, t_dec); // 拼接成 "25.67"
-          // 处理湿度
-          int h_int = (int)hum;
-          int h_dec = (int)((hum - h_int) * 100);
-          if (h_dec < 0) h_dec = -h_dec;
-          sprintf(str_hum, "%d.%02d", h_int, h_dec);
-         
+          // int t_int = (int)temp;                  // 获取整数部分 (例如 25)
+          // int t_dec = (int)((temp - t_int) * 100); // 获取小数部分 (例如 67)
+          // if (t_dec < 0) t_dec = -t_dec;          // 防止负数温度导致负号重复 (如 -5.-20)
+          // sprintf(str_temp, "%d.%02d", t_int, t_dec); // 拼接成 "25.67"
+          // // 处理湿度
+          // int h_int = (int)hum;
+          // int h_dec = (int)((hum - h_int) * 100);
+          // if (h_dec < 0) h_dec = -h_dec;
+          // sprintf(str_hum, "%d.%02d", h_int, h_dec);
+         // ================= 现在删掉nano后，直接这样写 =================
+          sprintf(str_temp, "%.2f", temp);   // 输出：25.6
+          sprintf(str_hum, "%.2f", hum);     // 输出：60.5    
       } 
       else 
       {
           // 如果读取失败，显示错误提示
           POINT_COLOR = RED;
-          //LCD_ShowString(60, 180, 70, 16, 16, (u8*)"Error");
-          //(60, 200, 70, 16, 16, (u8*)"Error");
+          LCD_ShowString(60, 180, 70, 16, 16, (u8*)"Error");
+          LCD_ShowString(60, 200, 70, 16, 16, (u8*)"Error");
       }
-      
-
       // ================== 2. 读取并显示光照度 (SY30/BH1750) ==================
       light = GY30_GetData();      
       // 格式化为 5 位整数字符串（例如 "  150" 或 "00150"）
-      sprintf(str_light, "%5d", light);     
-      // 在 x=80, y=220 处显示光照数值
+      sprintf(str_light, "%u", light);     
+      
       display_refresh(str_temp, str_hum, str_light);
-      //LCD_ShowString(50, 220, 70, 16, 16, (u8*)str_light);
       // 1. 核心：循环处理 MQTT 状态机 (连接、订阅、发布、保活)
       do_mqtt(); 
       // 翻转 LED 表示程序在运行

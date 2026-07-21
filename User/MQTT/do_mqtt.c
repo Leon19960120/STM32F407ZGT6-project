@@ -235,7 +235,7 @@ void do_mqtt(void)
        
         char payload_buf[128];
         sprintf(payload_buf, 
-        "{\"id\":\"123\",\"version\":\"1.0\",\"params\":{\"Temp\":{\"value\":%.1f},\"humidity\":{\"value\":%d}}}",temp,(int)hum);
+        "{\"id\":\"123\",\"version\":\"1.0\",\"params\":{\"Temp\":{\"value\":%.2f},\"humidity\":{\"value\":%d}}}",temp,(int)hum);
         //pubmessage.payload = "{\"id\":\"123\",\"version\":\"1.0\",\"params\":{\"Temp\":{\"value\":26.8},\"humidity\":{\"value\":60}}}";
         pubmessage.payload = payload_buf;
         pubmessage.payloadlen = strlen(pubmessage.payload);
