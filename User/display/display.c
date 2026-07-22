@@ -32,7 +32,7 @@ void display_set_data(float temp, float hum, uint16_t light) {
 }
 
 
-void display_refresh(u8 *str_temp, u8 *str_hum, u8 *str_light)
+void display_refresh(const char *str_temp, const char  *str_hum, const char *str_light)
 {
     POINT_COLOR = RED;
     BACK_COLOR = WHITE;  
@@ -44,9 +44,9 @@ void display_refresh(u8 *str_temp, u8 *str_hum, u8 *str_light)
     //LCD_ShowString(80, 200, 70, 16, 16, (u8*)str_hum); 
 
     // 温度 y=180，宽度70，高度16
-    LCD_ShowString(85, 180, 70, 16, 16, str_temp);
+    LCD_ShowString(85, 180, 70, 16, 16, (uint8_t*)str_temp);
     // 湿度 y=200，宽度70，高度16
-    LCD_ShowString(85, 200, 70, 16, 16, str_hum);
+    LCD_ShowString(85, 200, 70, 16, 16, (uint8_t*)str_hum);
     // 光照 y=220，宽度70，高度16
     LCD_ShowString(85, 220, 70, 16, 16, str_light);
 }
@@ -57,6 +57,4 @@ void display_time(char* date_str, char* time_str){
     LCD_ShowString(30, 130, 200, 16, 16, (u8*)time_str); 
     //LCD_ShowString(30, 130, 200, 12, 12, (u8*)"2026/07/06");                      // 显示日期 
     LCD_ShowString(30, 110, 200, 16, 16, (u8*)date_str);//RTC日期
-      
-
 }   
