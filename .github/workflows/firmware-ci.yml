@@ -1,0 +1,95 @@
+name: Firmware CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firmware-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build STM32 firmware
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v7
+
+      - name: Install ARM GNU toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            gcc-arm-none-eabi \
+            libnewlib-arm-none-eabi \
+            make
+          arm-none-eabi-gcc --version
+
+      - name: Clean build directory
+        run: make clean
+
+      - name: Build firmware
+        run: make --jobs="$(nproc)" all
+
+      - name: Check firmware size
+        shell: bash
+        env:
+          ELF_FILE: build/sht35.elf
+          FLASH_BUDGET: "943718"  # 90% of the 1 MiB application Flash
+          RAM_BUDGET: "117964"    # 90% of the 128 KiB main SRAM
+        run: |
+          set -euo pipefail
+
+          arm-none-eabi-size "$ELF_FILE" | tee build/size.txt
+          read -r text_size data_size bss_size <<< "$(
+            arm-none-eabi-size "$ELF_FILE" | awk 'NR == 2 { print $1, $2, $3 }'
+          )"
+
+          flash_used=$((text_size + data_size))
+          ram_used=$((data_size + bss_size))
+          flash_percent=$(awk -v used="$flash_used" -v max="$FLASH_BUDGET" \
+            'BEGIN { printf "%.1f", used * 100 / max }')
+          ram_percent=$(awk -v used="$ram_used" -v max="$RAM_BUDGET" \
+            'BEGIN { printf "%.1f", used * 100 / max }')
+
+          {
+            echo "## Firmware size"
+            echo
+            echo "| Region | Used | CI budget | Budget used |"
+            echo "|---|---:|---:|---:|"
+            echo "| Flash | ${flash_used} bytes | ${FLASH_BUDGET} bytes | ${flash_percent}% |"
+            echo "| RAM | ${ram_used} bytes | ${RAM_BUDGET} bytes | ${ram_percent}% |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if (( flash_used > FLASH_BUDGET )); then
+            echo "Flash budget exceeded: ${flash_used} > ${FLASH_BUDGET} bytes" >&2
+            exit 1
+          fi
+
+          if (( ram_used > RAM_BUDGET )); then
+            echo "RAM budget exceeded: ${ram_used} > ${RAM_BUDGET} bytes" >&2
+            exit 1
+          fi
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: sht35-firmware-${{ github.sha }}
+          path: |
+            build/sht35.bin
+            build/sht35.hex
+            build/sht35.elf
+            build/sht35.map
+            build/size.txt
+          if-no-files-found: error
+          retention-days: 14
