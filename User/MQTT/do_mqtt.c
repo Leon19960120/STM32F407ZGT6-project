@@ -25,13 +25,13 @@ mqttconn mqtt_params = {
         0,
     },                                                                                                                                                  /*Define the Connection Server IP*/
     .port = 1883,                                                                                                                                          /*Define the connection service port number*/
-    .clientid = "Test",                                                                                                                            /*Define the client ID*/
-    .username = "Q0l3rvndi9",                                                                                                                              /*Define the user name*/
-    .passwd = "version=2018-10-31&res=products%2FQ0l3rvndi9%2Fdevices%2FTest&et=2079998482&method=md5&sign=IpF4ydrbrzw3N755Q%2FS%2BZg%3D%3D", /*Define user passwords*/
-    .pubtopic = "$sys/Q0l3rvndi9/Test/thing/property/post",                                                                                        /*Define the publication message*/
-    .pubtopic_reply = "$sys/Q0l3rvndi9/Test/thing/property/post/reply",
-    .subtopic = "$sys/Q0l3rvndi9/Test/thing/property/set", /*Define subscription messages*/
-    .subtopic_reply = "$sys/Q0l3rvndi9/Test/thing/property/set_reply",
+    .clientid = "SHT35",                                                                                                                            /*Define the client ID*/
+    .username = "1ps6O97B8k",                                                                                                                              /*Define the user name*/
+    .passwd = "version=2018-10-31&res=products%2F1ps6O97B8k%2Fdevices%2FSHT35&et=1816168847&method=sha1&sign=aqYu2HK0TzX%2BcCI4fHENQwHAfqM%3D", /*Define user passwords*/
+    .pubtopic = "$sys/1ps6O97B8k/SHT35/thing/property/post",                                                                                        /*Define the publication message*/
+    .pubtopic_reply = "$sys/1ps6O97B8k/SHT35/thing/property/post/reply",
+    .subtopic = "$sys/1ps6O97B8k/SHT35/thing/property/set", /*Define subscription messages*/
+    .subtopic_reply = "$sys/1ps6O97B8k/SHT35/thing/property/set_reply",
     .pubQoS = QOS0,                /*Defines the class of service Testfor publishing messages*/
     .willtopic = "/wizchip/will",  /*Define the topic of the will*/
     .willQoS = QOS0,               /*Defines the class of service for Will messages*/
@@ -235,7 +235,7 @@ void do_mqtt(void)
        
         char payload_buf[128];
         sprintf(payload_buf, 
-        "{\"id\":\"123\",\"version\":\"1.0\",\"params\":{\"Temp\":{\"value\":%.2f},\"humidity\":{\"value\":%d}}}",temp,(int)hum);
+        "{\"id\":\"123\",\"version\":\"1.0\",\"params\":{\"Temp\":{\"value\":%.2f},\"Humidity\":{\"value\":%.2f},\"Light\":{\"value\":%d}}}",temp,hum,light);
         //pubmessage.payload = "{\"id\":\"123\",\"version\":\"1.0\",\"params\":{\"Temp\":{\"value\":26.8},\"humidity\":{\"value\":60}}}";
         pubmessage.payload = payload_buf;
         pubmessage.payloadlen = strlen(pubmessage.payload);

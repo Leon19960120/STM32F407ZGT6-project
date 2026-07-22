@@ -4,14 +4,14 @@
 #include "stdlib.h"
 #include "stm32f4xx_hal.h"
 
-//////////////////////////////////////////////////////////////////////////////////	 
+
+//********************************************************************************	 
 //2.4寸/2.8寸/3.5寸/4.3寸 TFT液晶驱动	  
 //支持驱动IC型号包括:ILI9341/ILI9325/RM68042/RM68021/ILI9320/ILI9328/LGDP4531/LGDP4535/
 //                  SPFD5408/1505/B505/C505/NT35310/NT35510等		    
 //STM32F4工程-库函数版本
 //淘宝店铺：http://mcudev.taobao.com		
 //********************************************************************************
-//////////////////////////////////////////////////////////////////////////////////
 
 // ================= 补充标准库的数据类型定义 =================
 typedef uint8_t  u8;
@@ -137,17 +137,17 @@ typedef struct
 #define DFT_SCAN_DIR  L2R_U2D  //默认的扫描方向
 
 //画笔颜色
-#define WHITE         	 0xFFFF
-#define BLACK         	 0x0000	  
-#define BLUE         	 0x001F  
-#define BRED             0XF81F
-#define GRED 			 0XFFE0
-#define GBLUE			 0X07FF
-#define RED           	 0xF800
-#define MAGENTA       	 0xF81F
-#define GREEN         	 0x07E0
-#define CYAN          	 0x7FFF
-#define YELLOW        	 0xFFE0
+#define WHITE         	 0xFFFF //白色
+#define BLACK         	 0x0000	//黑色
+#define BLUE         	 0x001F //蓝色
+#define BRED             0XF81F //棕红色
+#define GRED 			 0XFFE0 //灰色
+#define GBLUE			 0X07FF //浅蓝
+#define RED           	 0xF800 //红色
+#define MAGENTA       	 0xF81F //品红
+#define GREEN         	 0x07E0 //绿色
+#define CYAN          	 0x7FFF //青色
+#define YELLOW        	 0xFFE0 //黄色
 #define BROWN 			 0XBC40 //棕色
 #define BRRED 			 0XFC07 //棕红色
 #define GRAY  			 0X8430 //灰色

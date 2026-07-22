@@ -14,6 +14,7 @@
  *    Allan Stockdill-Mander/Ian Craggs - initial API and implementation and/or initial documentation
  *******************************************************************************/
 #include "MQTTClient.h"
+#include "main.h"
 
 static void NewMessageData(MessageData* md, MQTTString* aTopicName, MQTTMessage* aMessage) {
     md->topicName = aTopicName;
@@ -356,48 +357,77 @@ int MQTTConnect(MQTTClient* c, MQTTPacket_connectData* options)
     int len = 0;
 
 #if defined(MQTT_TASK)
-	MutexLock(&c->mutex);
+    MutexLock(&c->mutex);
 #endif
-	if (c->isconnected) /* don't send connect packet again if we are already connected */
-		goto exit;
 
+    if (c->isconnected) /* 如果已经连接，则不再发送 connect 报文 */
+        goto exit;
+        
     TimerInit(&connect_timer);
     TimerCountdownMS(&connect_timer, c->command_timeout_ms);
 
     if (options == 0)
-        options = &default_options; /* set default options if none were supplied */
+        options = &default_options; /* 如果没有提供选项，则使用默认选项 */
 
     c->keepAliveInterval = options->keepAliveInterval;
     TimerCountdown(&c->ping_timer, c->keepAliveInterval);
-    if ((len = MQTTSerialize_connect(c->buf, c->buf_size, options)) <= 0)
+    
+    // 1. 尝试打包 MQTT CONNECT 报文
+    if ((len = MQTTSerialize_connect(c->buf, c->buf_size, options)) <= 0) {
+        printf("[MQTT ERR] 报文打包失败, len=%d\r\n", len);
         goto exit;
-    if ((rc = sendPacket(c, len, &connect_timer)) != SUCCESSS)  // send the connect packet
-        goto exit; // there was a problem
-
-    // this will be a blocking call, wait for the connack
+    }
+        
+    // 2. 尝试通过底层发送报文 (注意：请检查你的宏定义是 SUCCESS 还是 SUCCESSS，这里暂用 SUCCESS)
+    if ((rc = sendPacket(c, len, &connect_timer)) != SUCCESS) {  
+        printf( "[MQTT ERR] 底层 sendPacket 发送失败, rc=%d\r\n", rc);
+        goto exit; 
+    }
+    
+    printf( "[MQTT INFO] 报文已发送，开始等待 CONNACK...\r\n");
+    
+    // 3. 阻塞等待 CONNACK 响应
     if (waitfor(c, CONNACK, &connect_timer) == CONNACK)
     {
         unsigned char connack_rc = 255;
         unsigned char sessionPresent = 0;
+        
+        // 尝试解析收到的 CONNACK 报文
         if (MQTTDeserialize_connack(&sessionPresent, &connack_rc, c->readbuf, c->readbuf_size) == 1)
-            rc = connack_rc;
+        {
+            rc = connack_rc; // 获取服务器返回的状态码
+            if (rc == 0) {
+                printf( "[MQTT SUCCESS] 连接成功!\r\n");
+            } else {
+                printf( "[MQTT ERR] 服务器拒绝连接, 错误码: %d\r\n", rc);
+            }
+        }
         else
+        {
+            // 收到了数据，但不是合法的 CONNACK 格式（可能是收到了 "SEND OK" 或 "CLOSED" 等文本）
+            printf("[MQTT ERR] 收到数据，但解析 CONNACK 失败 (缓冲区可能有垃圾数据)\r\n");
             rc = FAILURE;
+        }
     }
-    else
+    else 
+    {
+        // 超时，根本没收到任何数据
+        printf( "[MQTT ERR] 等待 CONNACK 超时! (未收到 +IPD)\r\n");
         rc = FAILURE;
+    }
 
 exit:
-    if (rc == SUCCESSS)
+    // 如果返回码为 0 (SUCCESS)，则标记为已连接
+    if (rc == 0) { 
         c->isconnected = 1;
+    }
 
 #if defined(MQTT_TASK)
-	MutexUnlock(&c->mutex);
+    MutexUnlock(&c->mutex);
 #endif
 
     return rc;
 }
-
 
 int MQTTSubscribe(MQTTClient* c, const char* topicFilter, enum QoS qos, messageHandler messageHandler)
 {

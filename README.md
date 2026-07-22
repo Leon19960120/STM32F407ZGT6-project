@@ -195,7 +195,7 @@ STM32_Programmer_CLI -c port=swd -w build/sht35.bin 0x08000000 -v -rst
 
 - **MCU**: STM32F407ZGT6（Cortex-M4F，带 FPU）
 - **编译器**: GCC ARM Embedded（arm-none-eabi-gcc）
-- **标准库**: STM32 HAL Library v1.6+
+- **hal库**: STM32 HAL Library v1.6+
 - **构建工具**: GNU Make
 - **IDE**: VSCode + CMake/Makefile 插件（可选）
 - **调试器**: ST-Link + OpenOCD
