@@ -35,7 +35,7 @@
   #include "SHT3x.h"  //引入温湿度传感器
   #include "SY30.h"   //光照传感器
   #include "lcd.h"    //TFT LCD屏幕
-  #include "W5500.h"  //w5500
+  #include "w5500.h"  //w5500
   #include "wizchip_conf.h"
   #include "wiz_interface.h"
   #include "do_mqtt.h"
@@ -69,7 +69,7 @@
   extern w25qxx_handle_t g_w25qxx_handle;
   #define SOCKET_ID 0
   #define ETHERNET_BUF_MAX_SIZE (1024 * 2)
-  u8 lcd_id[12]; // 存放LCD ID字符串
+  //u8 lcd_id[12]; // 存放LCD ID字符串
   float hum = 0.0f;       // 用于存储湿度值
   float temp = 0.0f;      // 用于存储温度值
   uint16_t light = 0;     //光照强度
@@ -179,7 +179,7 @@ int main(void)
       char str_light[32]; 
       uint32_t last_sensor_time = 0;
       uint32_t last_rtc_time = 0;
-      w25qxx_handle_t g_w25qxx_handle;
+      
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -222,60 +222,31 @@ int main(void)
   HAL_UART_Transmit(&huart1, test, sizeof(test), 100);
   HAL_Delay(10);
   printf("%s MQTT OneNET example\r\n",_WIZCHIP_ID_);
+ 
+  //6. 初始化 LittleFS (内部会自动初始化 W25Q16)
   
   printf("\r\n========================================\r\n");
-  printf("  W25Q16 (LibDriver) Test Start\r\n");
+  printf("  W25Q16 + LittleFS Final Test\r\n");
   printf("========================================\r\n");
-  // 2. 【极其重要】先将整个结构体清零，防止野指针或垃圾数据
-  memset(&g_w25qxx_handle, 0, sizeof(w25qxx_handle_t));
 
-  // 3. 绑定你之前写好的底层接口函数 (回调函数)
-  g_w25qxx_handle.spi_qspi_init       = w25qxx_interface_spi_qspi_init;
-  g_w25qxx_handle.debug_print         = w25qxx_interface_debug_print;
-  g_w25qxx_handle.spi_qspi_deinit     = w25qxx_interface_spi_qspi_deinit;
-  g_w25qxx_handle.spi_qspi_write_read = w25qxx_interface_spi_qspi_write_read;
-  g_w25qxx_handle.delay_ms            = w25qxx_interface_delay_ms;
-  g_w25qxx_handle.delay_us            = w25qxx_interface_delay_us;
-  // 4. 配置硬件参数 (源码中会检查这些值)
-  g_w25qxx_handle.spi_qspi = W25QXX_INTERFACE_SPI; // 告诉驱动：我用的是标准 SPI，不是 QSPI
-  g_w25qxx_handle.type     = W25Q16;               // ⚠️ 告诉驱动：我的芯片型号是 W25Q16！
-
-  g_w25qxx_handle.address_mode       = W25QXX_ADDRESS_MODE_3_BYTE;  // 3字节地址（普通Flash都用这个）
-  g_w25qxx_handle.dual_quad_spi_enable = 0;                         // 标准SPI，不用双线/四线
-  g_w25qxx_handle.dummy              = 0;                           // 标准SPI不需要dummy周期
-  g_w25qxx_handle.param              = 0;                           // 保留参数，默认0即可
-
-  // 5. 初始化 W25Qxx 驱动 (内部会自动调用你写的 w25qxx_interface_spi_qspi_init)
-  if (w25qxx_init(&g_w25qxx_handle) != 0) {
-      printf("[ERROR] W25Q16 init failed! Check SPI wiring or CS pin.\r\n");
-      while(1); // 初始化失败则卡死，方便排查
+  if (lfs_port_init()!= 0) 
+  {
+      printf("[ERROR] System Init Failed! Halt.\r\n");
+    while(1); // 失败后停在这里，方便看串口调试
   }
-  printf("[INFO] W25Q16 init success!\r\n");
+  else
+  {
+      printf("[INFO] LittleFS Mount Success!\r\n");
+  }
+    printf("[INFO] System Ready! Logging...\r\n\r\n");
 
-    //6. 初始化 LittleFS (内部会自动初始化 W25Q16)
-    
-    printf("\r\n========================================\r\n");
-    printf("  W25Q16 + LittleFS Final Test\r\n");
-    printf("========================================\r\n");
+  // 3. 写入测试日志
+  save_log_to_flash("System Boot OK.");
+  save_log_to_flash("SPI & LittleFS Init Success.");
+  save_log_to_flash("This is a test log from W25Q16.");
 
-    if (lfs_port_init()!= 0) 
-    {
-       printf("[ERROR] System Init Failed! Halt.\r\n");
-      while(1); // 失败后停在这里，方便看串口调试
-    }
-    else
-    {
-        printf("[INFO] LittleFS Mount Success!\r\n");
-    }
-     printf("[INFO] System Ready! Logging...\r\n\r\n");
-
-    // 3. 写入测试日志
-    save_log_to_flash("System Boot OK.");
-    save_log_to_flash("SPI & LittleFS Init Success.");
-    save_log_to_flash("This is a test log from W25Q16.");
-
-    // 4. 读取并打印所有日志
-    read_all_logs();
+  // 4. 读取并打印所有日志
+  read_all_logs();
   /* wizchip init */
   wizchip_initialize();
   uint8_t version = getVERSIONR(); // 读取 W5500 版本寄存器 (固定为 0x04)
@@ -283,18 +254,13 @@ int main(void)
   network_init(ethernet_buf, &default_net_info);
   mqtt_init(SOCKET_ID, mqtt_send_ethernet_buf, mqtt_recv_ethernet_buf);
 
-  // 1. 初始化 LCD
-  LCD_Init(); 
  
-  // 1. 将 LCD ID 格式化到字符串数组
-  sprintf((char *)lcd_id, "LCD ID:%04X", lcddev.id);
-  // 显示固定的标题（只画一次，避免闪烁）
-  // 3. 设置画笔颜色
-  POINT_COLOR = RED;  
-  LCD_ShowString(30, 10, 200, 16, 16, lcd_id);       // 显示 LCD ID 
-  // 直接显示 16 位十六进制数，04X 格式（自动补前导零）
-  POINT_COLOR = RED;
-  //LCD_ShowNum(30, 90, lcddev.id, 4, 16);  // 显示4位16进制数字
+ 
+  
+  
+  
+  
+
 
   RTC_TimeTypeDef sTime = {0};
   RTC_DateTypeDef sDate = {0};
@@ -309,7 +275,6 @@ int main(void)
   /* USER CODE BEGIN WHILE */
     while (1)
     { 
-    
      // ---------------------------------------------------------
      // 任务1：每 1000ms 执行一次传感器读取和 MQTT
      // --------------------------------------------------------- 
@@ -319,21 +284,8 @@ int main(void)
         // 1. 读取传感器数据
       if (ReadSHT3x(&hum, &temp)) 
       {
-          // ================= 核心避坑：浮点数转字符串 =================
-          // 因为 GCC 的 nano.specs 默认不支持 %f，我们必须手动拆分整数和小数部分        
-          // 处理温度
-          // int t_int = (int)temp;                  // 获取整数部分 (例如 25)
-          // int t_dec = (int)((temp - t_int) * 100); // 获取小数部分 (例如 67)
-          // if (t_dec < 0) t_dec = -t_dec;          // 防止负数温度导致负号重复 (如 -5.-20)
-          // sprintf(str_temp, "%d.%02d", t_int, t_dec); // 拼接成 "25.67"
-          // // 处理湿度
-          // int h_int = (int)hum;
-          // int h_dec = (int)((hum - h_int) * 100);
-          // if (h_dec < 0) h_dec = -h_dec;
-          // sprintf(str_hum, "%d.%02d", h_int, h_dec);
-         // ================= 现在删掉nano后，直接这样写 =================
-          sprintf(str_temp,"%.2f", temp);    // 输出：25.6
-          sprintf(str_hum, "%.2f", hum);     // 输出：60.5    
+          sprintf(str_temp,"%.2f", temp);    // 输出：25.60
+          sprintf(str_hum, "%.2f", hum);     // 输出：60.50    
       } 
       else 
       {
@@ -354,9 +306,9 @@ int main(void)
       HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_9); // 请根据你的实际 LED 引脚修改！
     }
         // ---------------------------------------------------------
-        // 任务2：每 200ms 刷新一次 RTC 时间，确保秒数平滑不跳帧
+        // 任务2：每 1000ms 刷新一次 RTC 时间，确保秒数平滑不跳帧
         // ---------------------------------------------------------
-        if (HAL_GetTick() - last_rtc_time >= 200)
+        if (HAL_GetTick() - last_rtc_time >= 1000U)
         {
             last_rtc_time = HAL_GetTick(); // 更新时间戳
      if(HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN)==HAL_OK){
