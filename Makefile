@@ -298,7 +298,19 @@ clean:
 #######################################
 -include $(wildcard $(BUILD_DIR)/*.d)
 
-flash:
-	openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program build/sht35.hex verify reset exit"
-	
+OPENOCD ?= openocd
+OPENOCD_INTERFACE ?= interface/stlink.cfg
+OPENOCD_TARGET ?= target/stm32f4x.cfg
+FLASH_IMAGE := $(BUILD_DIR)/$(TARGET).hex
+
+OPENOCD_FLAGS = -f $(OPENOCD_INTERFACE) -c "transport select swd" -f $(OPENOCD_TARGET)
+OPENOCD_PORTS = -c "gdb port disabled; tcl port disabled; telnet port disabled"
+
+.PHONY: flash flash-if-needed
+
+flash: $(FLASH_IMAGE)
+	$(OPENOCD) $(OPENOCD_FLAGS) $(OPENOCD_PORTS) -c "program $(FLASH_IMAGE) verify reset exit"
+
+flash-if-needed: $(FLASH_IMAGE)
+	$(OPENOCD) $(OPENOCD_FLAGS) $(OPENOCD_PORTS) -c "program $(FLASH_IMAGE) preverify verify reset exit"
 # *** EOF ***

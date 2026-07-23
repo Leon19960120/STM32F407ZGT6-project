@@ -59,7 +59,7 @@ void MX_RTC_Init(void)
   /* USER CODE BEGIN Check_RTC_BKUP */
 
   // 1. 检查后备寄存器 1（RTC_BKP_DR1）是否等于我们的暗号 0x32F3
-  if (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR1) == 0x32F3)
+  if (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR1) == 0x32F4)
   {
     // 如果暗号对上了，说明电池一直有电，RTC 还在精确运行
     // 直接 return 退出，绝对不要让它执行后面的 SetTime 和 SetDate！
@@ -73,8 +73,8 @@ void MX_RTC_Init(void)
 
   /** Initialize RTC and set the Time and Date
   */
-  sTime.Hours = 7;
-  sTime.Minutes = 58;
+  sTime.Hours = 8;
+  sTime.Minutes = 53;
   sTime.Seconds = 0;
   sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
   sTime.StoreOperation = RTC_STOREOPERATION_RESET;
@@ -82,9 +82,9 @@ void MX_RTC_Init(void)
   {
     Error_Handler();
   }
-  sDate.WeekDay = RTC_WEEKDAY_MONDAY;
+  sDate.WeekDay = RTC_WEEKDAY_WEDNESDAY;
   sDate.Month = RTC_MONTH_JULY;
-  sDate.Date = 15;
+  sDate.Date = 22;
   sDate.Year = 26;
 
   if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)

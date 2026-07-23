@@ -326,6 +326,7 @@ uint8_t spi_init(void)
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
     
     return 0; // 成功返回 0
+    
 }
 
 /**
