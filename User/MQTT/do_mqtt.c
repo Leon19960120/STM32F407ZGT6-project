@@ -8,8 +8,14 @@
 #include "wiz_platform.h"
 
 #include "delay.h"
+#include "main.h"
+#include "socket.h"
 
 #define MQTT_ETHERNET_MAX_SIZE (1024 * 2)
+
+#define MQTT_UPLOAD_INTERVAL_MS 30000U
+
+static uint32_t last_upload_time = 0U;
 
 extern float temp;
 extern float hum;
@@ -230,7 +236,16 @@ void do_mqtt(void)
         break;
     }
     case PUB_MESSAGE:
-    {
+    {   
+      
+       uint32_t now = HAL_GetTick();
+
+        if ((last_upload_time != 0U) &&
+            (now - last_upload_time < MQTT_UPLOAD_INTERVAL_MS))
+        {
+            run_status = KEEPALIVE;
+            break;
+        }
         pubmessage.qos = QOS0;
        
         char payload_buf[128];
@@ -246,7 +261,9 @@ void do_mqtt(void)
             run_status = ERR;
         }
         else
-        {
+        {   
+            /* 发布成功后，记录本次上传时间 */
+            last_upload_time = now;
             printf("publish:%s,%s\r\n\r\n", mqtt_params.pubtopic, (char *)pubmessage.payload);
             run_status = KEEPALIVE;
         }
@@ -272,11 +289,58 @@ void do_mqtt(void)
         Delay_ms(100);
         break;
     }
-    case ERR: /* Running error */
-        printf("system ERROR!");
-        Delay_ms(1000);
-        break;
+    // case ERR: /* Running error */
+    //     printf("system ERROR!\r\n");
+    //     Delay_ms(1000);
+    //     break;
+    case ERR:
+    {
+    static uint32_t last_retry_time = 0;
+    uint8_t phy_link = PHY_LINK_OFF;
 
+    /* 每3秒尝试恢复一次 */
+    if (HAL_GetTick() - last_retry_time < 3000U)
+    {
+        break;
+    }
+    last_retry_time = HAL_GetTick();
+
+    /* 先检查网线是否已经插回 */
+    if (ctlwizchip(CW_GET_PHYLINK, &phy_link) != 0 ||
+        phy_link == PHY_LINK_OFF)
+    {
+        printf("[NET] Ethernet cable disconnected\r\n");
+        break;
+    }
+
+    printf("[NET] PHY link recovered, reconnecting...\r\n");
+
+    /* 强制关闭已经失效的TCP socket */
+    close(n.my_socket);
+
+    /* 清除MQTT旧连接状态 */
+    c.isconnected = 0;
+    c.ping_outstanding = 0;
+
+    /* 重新建立TCP连接 */
+    if (ConnectNetwork(&n,
+                       mqtt_params.server_ip,
+                       mqtt_params.port) != SOCK_OK)
+    {
+        printf("[NET] TCP reconnect failed, socket=0x%02X\r\n",
+               getSn_SR(n.my_socket));
+        break;
+    }
+
+    printf("[NET] TCP reconnect success\r\n");
+
+    /*
+     * 下一次进入CONN：
+     * MQTT连接 → 重新订阅 → 恢复发布
+     */
+    run_status = CONN;
+    break;
+    }
     default:
         break;
     }

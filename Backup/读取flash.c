@@ -26,3 +26,40 @@
 //       while(1); // 初始化失败则卡死，方便排查
 //   }
 //   printf("[INFO] W25Q16 init success!\r\n");
+
+
+
+/**
+ * @brief  绕过所有驱动，直接用 HAL 库读取 Flash ID
+ */
+// void test_spi_flash_raw_id(void)
+// {
+//     uint8_t tx_buf[4] = {0x90, 0x00, 0x00, 0x00}; // 0x90 是读 Manufacturer ID 指令
+//     uint8_t rx_buf[2] = {0xFF, 0xFF};             // 初始化为 0xFF
+    
+//     printf("\r\n--- Raw SPI Flash ID Test ---\r\n");
+    
+//     // 1. 拉低 CS (假设你的 CS 是 PA14，如果不是请修改)
+//     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET); 
+    
+//     // 2. 发送指令 (阻塞模式)
+//     HAL_SPI_Transmit(&hspi3, tx_buf, 4, 100);
+    
+//     // 3. 接收 ID (阻塞模式)
+//     HAL_SPI_Receive(&hspi3, rx_buf, 2, 100);
+    
+//     // 4. 拉高 CS
+//     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
+    
+//     // 5. 打印结果
+//     printf("Raw RX Data: 0x%02X 0x%02X\r\n", rx_buf[0], rx_buf[1]);
+    
+//     if (rx_buf[0] == 0xEF) {
+//         printf("[SUCCESS] Manufacturer is Winbond! SPI is OK.\r\n");
+//     } else if (rx_buf[0] == 0xFF || rx_buf[0] == 0x00) {
+//         printf("[FAILED] Read 0xFF or 0x00. Check CS pin or MISO wiring!\r\n");
+//     } else {
+//         printf("[FAILED] Read 0x%02X. SPI Mode or Clock is WRONG!\r\n", rx_buf[0]);
+//     }
+//     printf("-------------------------------\r\n\r\n");
+// }

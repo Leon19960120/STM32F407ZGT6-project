@@ -66,10 +66,10 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-  extern w25qxx_handle_t g_w25qxx_handle;
+  
   #define SOCKET_ID 0
   #define ETHERNET_BUF_MAX_SIZE (1024 * 2)
-  //u8 lcd_id[12]; // 存放LCD ID字符串
+  
   float hum = 0.0f;       // 用于存储湿度值
   float temp = 0.0f;      // 用于存储温度值
   uint16_t light = 0;     //光照强度
@@ -130,40 +130,7 @@ int _write(int fd, char *ptr, int len)
     errno = EBADF;
     return -1;
 }
-/**
- * @brief  绕过所有驱动，直接用 HAL 库读取 Flash ID
- */
-// void test_spi_flash_raw_id(void)
-// {
-//     uint8_t tx_buf[4] = {0x90, 0x00, 0x00, 0x00}; // 0x90 是读 Manufacturer ID 指令
-//     uint8_t rx_buf[2] = {0xFF, 0xFF};             // 初始化为 0xFF
-    
-//     printf("\r\n--- Raw SPI Flash ID Test ---\r\n");
-    
-//     // 1. 拉低 CS (假设你的 CS 是 PA14，如果不是请修改)
-//     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET); 
-    
-//     // 2. 发送指令 (阻塞模式)
-//     HAL_SPI_Transmit(&hspi3, tx_buf, 4, 100);
-    
-//     // 3. 接收 ID (阻塞模式)
-//     HAL_SPI_Receive(&hspi3, rx_buf, 2, 100);
-    
-//     // 4. 拉高 CS
-//     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
-    
-//     // 5. 打印结果
-//     printf("Raw RX Data: 0x%02X 0x%02X\r\n", rx_buf[0], rx_buf[1]);
-    
-//     if (rx_buf[0] == 0xEF) {
-//         printf("[SUCCESS] Manufacturer is Winbond! SPI is OK.\r\n");
-//     } else if (rx_buf[0] == 0xFF || rx_buf[0] == 0x00) {
-//         printf("[FAILED] Read 0xFF or 0x00. Check CS pin or MISO wiring!\r\n");
-//     } else {
-//         printf("[FAILED] Read 0x%02X. SPI Mode or Clock is WRONG!\r\n", rx_buf[0]);
-//     }
-//     printf("-------------------------------\r\n\r\n");
-// }
+
 /* USER CODE END 0 */
 
 /**
@@ -196,7 +163,7 @@ int main(void)
 
   /* USER CODE BEGIN SysInit */
 
-  // 4. 【关键修正】DWT 延时初始化，必须放在 SystemClock_Config() 之后！
+  // 4. DWT 延时初始化，必须放在 SystemClock_Config() 之后！
   // 此时 SystemCoreClock 已经是准确的 168,000,000
   Delay_Init();
     
@@ -232,7 +199,6 @@ int main(void)
   if (lfs_port_init()!= 0) 
   {
       printf("[ERROR] System Init Failed! Halt.\r\n");
-    while(1); // 失败后停在这里，方便看串口调试
   }
   else
   {
@@ -284,18 +250,30 @@ int main(void)
         // 1. 读取传感器数据
       if (ReadSHT3x(&hum, &temp)) 
       {
-          sprintf(str_temp,"%.2f", temp);    // 输出：25.60
-          sprintf(str_hum, "%.2f", hum);     // 输出：60.50    
+          snprintf(str_temp, sizeof(str_temp), "%.2f", temp);
+          snprintf(str_hum, sizeof(str_hum), "%.2f", hum);
+          printf("temp%.2f,hum%.2f\r\n",temp,hum);
       } 
       else 
       {
           // 如果读取失败，显示错误提示
-          POINT_COLOR = RED;
-          LCD_ShowString(60, 180, 70, 16, 16, (u8*)"Error");
-          LCD_ShowString(60, 200, 70, 16, 16, (u8*)"Error");
+          snprintf(str_temp, sizeof(str_temp), "Error");
+          snprintf(str_hum, sizeof(str_hum), "Error");
       }
       // ================== 2. 读取并显示光照度 (SY30/BH1750) ==================
-      light = GY30_GetData();      
+      GY30_Init();
+      //light = GY30_GetData();
+      if (GY30_ReadLux(&light) == HAL_OK)
+          {
+              printf("Light: %u Lux\r\n", light);
+          }
+          else
+          {
+              printf("GY30 read failed\r\n");
+          }
+      
+      
+           
       // 格式化为 5 位整数字符串（例如 "150" 或 "00150"）
       sprintf(str_light,"%u", light);     
       

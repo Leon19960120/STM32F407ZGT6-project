@@ -38,12 +38,7 @@ void display_refresh(const char *str_temp, const char  *str_hum, const char *str
     POINT_COLOR = RED;
     BACK_COLOR = WHITE;  
     // ============================================================
-    // 2. 局部刷新显示数据 (使用白色背景覆盖旧数据，防止残影)   
-    // 显示温度 (x=60, y=60, 宽度60, 高度16, 字体16)
-    //LCD_ShowString(80, 180, 70, 16, 16, (u8*)str_temp); 
-    // 显示湿度 (x=60, y=90, 宽度60, 高度16, 字体16)
-    //LCD_ShowString(80, 200, 70, 16, 16, (u8*)str_hum); 
-
+    // 2. 局部刷新显示数据 (使用白色背景覆盖旧数据，防止残影)    
     // 温度 y=180，宽度70，高度16
     LCD_ShowString(85, 180, 70, 16, 16, (uint8_t*)str_temp);
     // 湿度 y=200，宽度70，高度16

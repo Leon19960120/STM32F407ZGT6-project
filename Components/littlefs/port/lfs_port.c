@@ -44,7 +44,7 @@ static int lfs_flash_prog(const struct lfs_config *c, lfs_block_t block,
                           lfs_off_t off, const void *buffer, lfs_size_t size)
 {
     uint32_t addr = LFS_FLASH_BASE_ADDR + block * c->block_size + off;   
-    uint8_t res = w25qxx_advance_write(addr, (uint8_t *)buffer, size);
+    uint8_t res = w25qxx_advance_page_program(addr, (uint8_t *)buffer, size);
     return (res == 0) ? 0 : LFS_ERR_IO;
 }
 
